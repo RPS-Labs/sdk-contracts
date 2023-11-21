@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.19;
 
 import {IRPSRaffle} from "./interface/IRPSRaffle.sol";
 import {IRPSRouter} from "./interface/IRPSRouter.sol";

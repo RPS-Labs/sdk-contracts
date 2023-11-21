@@ -16,6 +16,7 @@ import { applyTradeFee } from '../scripts/test/applyTradeFee';
 import { getProtocolFeeFromDelta } from '../scripts/test/getProtocolFee';
 import { calcPendingAmounts } from '../scripts/test/calcPendingAmount';
 import { tradeToFillPot } from '../scripts/test/tradeToFillPot';
+import { LINK } from '../Addresses';
 
 describe("RPS Raffle", function() {
   async function deployAndConfigureVRFContracts(): Promise<{
@@ -221,7 +222,8 @@ describe("RPS Raffle", function() {
       Protocol
     } = await loadFixture(deployEverythingFixture);
 
-    await tradeToFillPot(RPSRouter);
+    const tx = tradeToFillPot(RPSRouter);
+    await tx;
     
     const request_id = await RPSRaffle.lastRequestId();
     let request_created;

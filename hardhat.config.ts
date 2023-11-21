@@ -25,22 +25,22 @@ const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.21",
     settings: {
-        optimizer: {
-            enabled: true,
-            runs: 10000
-        }
+      optimizer: {
+        enabled: true,
+        runs: 10000
+      }
     }
   },
 
   networks: {
     hardhat: {
-        forking: {
-          url: forking_url,
-          blockNumber: forking_block_number,
-        },
-        accounts: {
-          accountsBalance: "20000000000000000000000" // 20000 ETH
-        }
+      forking: {
+        url: forking_url,
+        blockNumber: forking_block_number,
+      },
+      accounts: {
+        accountsBalance: "20000000000000000000000" // 20000 ETH
+      }
     },
     goerli: {
       url: INFURA_GOERLI_API,

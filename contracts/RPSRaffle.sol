@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.21;
+pragma solidity ^0.8.19;
 import {IRPSRaffle} from "./interface/IRPSRaffle.sol";
-import {VRFV2WrapperConsumerBase} from "@chainlink/contracts/src/v0.8/VRFV2WrapperConsumerBase.sol";
+import {VRFV2WrapperConsumerBase} from "@chainlink/contracts/src/v0.8/vrf/VRFV2WrapperConsumerBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import "hardhat/console.sol";
 
 contract RPSRaffle is 
     IRPSRaffle, 
@@ -358,9 +357,6 @@ contract RPSRaffle is
         uint32 _gasLimit = callbackGasLimit;
         require(_gasLimit > 0, "Gas limit not specified");
 
-        address _link = address(LINK);
-        uint8 _conf = VRF_CONFIRMATIONS;
-        console.log("Testing link %s %s", _link, _conf);
         uint256 requestId = requestRandomness(_gasLimit, VRF_CONFIRMATIONS, 1);
 
         chainlinkRequests[requestId].exists = true;
