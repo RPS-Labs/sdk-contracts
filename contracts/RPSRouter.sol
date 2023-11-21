@@ -30,7 +30,7 @@ contract RPSRouter is IRPSRouter, Ownable {
 
         // Integration call
         (bool success,) = protocol.call{ value: msg.value - raffleDelta }(data);
-        require(success);
+        require(success, "Call unsuccessful");
     }
 
     function setRaffleAddress(address _raffle) external onlyOwner {

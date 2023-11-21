@@ -27,6 +27,7 @@ export enum Network {
   EthereumSepolia = 11155111,
   Zksync = 324,
   Ancient8Testnet = 2863311531,
+  HardhatNetwork = 31337
 }
 
 export type ChainIdToAddress = { [chainId: number]: string };
@@ -36,10 +37,10 @@ export const HUNDRED_PERCENT = 10000n;
 export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
   potLimit: ethers.parseEther("100.0"),
   raffleTicketCost: ethers.parseEther("0.1"),
-  claimWindow: 24 * 60 * 60, // 1 day
+  claimWindow: 24 * 60 * 60 * 7, // 7 days
   numberOfWinners: 1,
-  protocolFeeInBps: HUNDRED_PERCENT / 10n,
-  tradeFeeInBps: HUNDRED_PERCENT / 10n,
+  protocolFeeInBps: 1000n,
+  tradeFeeInBps: 1000n,
   callbackGasLimit: 3_000_000,
   vrfConfirmations: 1,
   router: AddressZero,

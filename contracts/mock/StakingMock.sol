@@ -4,7 +4,7 @@ contract StakingMock {
     mapping(address => uint256) public staked;
 
     function stakeFor(address user, uint256 amount) external payable {
-        require(msg.value >= amount, "Empty staked value");
+        require(msg.value >= amount, "Insufficient staked value");
         staked[user] += amount;
     }
 }

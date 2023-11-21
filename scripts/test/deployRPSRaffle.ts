@@ -12,6 +12,7 @@ export async function deployRPSRaffle(
 
   if (VRFV2Wrapper) {
     const vrf_v2_wrapper_address = VRFV2Wrapper.target;
+    console.log("Deploying with LINK: ", LINK[chainId]);
     rps_raffle = await ethers.deployContract("RPSRaffle", [
       params,
       LINK[chainId],

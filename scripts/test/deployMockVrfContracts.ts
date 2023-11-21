@@ -13,7 +13,6 @@ export async function deployVRFContracts(): Promise<{
    */
   const decimals = 18;
   const initial_answer = 3000000000000000n;
-  console.log("Deploying V3 aggregator");
   const V3Aggregator = await ethers.deployContract(
     "MockV3Aggregator",
     [decimals, initial_answer]
@@ -23,7 +22,6 @@ export async function deployVRFContracts(): Promise<{
   /* 
     VRFCoordinatorV2
    */
-  console.log("Deploying coordinator");
   const base_fee = 100000000000000000n;
   const gas_price_LINK = 1000000000n;
   const VRFCoordinator = await ethers.deployContract(
@@ -35,7 +33,6 @@ export async function deployVRFContracts(): Promise<{
   /*
     VRFV2Wrapper deployment
   */
-  console.log("Deploying VRFV2Wrapper", VRFCoordinator);
   const VRFV2Wrapper = await ethers.deployContract(
     "VRFV2Wrapper",
     [LINK[chainId], V3Aggregator.target.toString(), VRFCoordinator.target.toString()]

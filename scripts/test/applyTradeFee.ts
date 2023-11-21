@@ -8,5 +8,5 @@ export function applyTradeFee(
     fee_in_bps = DefaultPRSRaffleParams.tradeFeeInBps;
   }
 
-  return amount * fee_in_bps! / HUNDRED_PERCENT;
+  return amount * HUNDRED_PERCENT / (HUNDRED_PERCENT - fee_in_bps);
 }
