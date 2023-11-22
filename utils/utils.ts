@@ -1,6 +1,7 @@
-import { ethers } from 'hardhat';
+import { ethers, network } from 'hardhat';
 import { RPSRaffleInitializeParams } from './types';
 import { AddressZero } from "@ethersproject/constants";
+import { BigNumberish } from 'ethers';
 
 export enum Network {
   // Mainnets
@@ -44,8 +45,13 @@ export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
   callbackGasLimit: 3_000_000,
   vrfConfirmations: 1,
   router: AddressZero,
-  owner: AddressZero
+  owner: AddressZero,
+  operator: AddressZero
 }
+
+export const DefaultRPSPrizeAmounts: Array<BigNumberish> = [
+  DefaultPRSRaffleParams.potLimit
+];
 
 export const getRandomFloat = (min: number, max: number) => Math.random() * (max - min) + min;
 

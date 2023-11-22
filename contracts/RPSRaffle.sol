@@ -22,6 +22,7 @@ contract RPSRaffle is
     uint16 public numberOfWinners;
     uint16 public protocolFeeInBps; // 100 = 1%, 10000 = 100%;
     uint128 private claimWindow;
+    uint256 private protocolFeeAccumulated;
 
     /* 
         Mappings
@@ -44,7 +45,7 @@ contract RPSRaffle is
         Roles
      */
     address public immutable ROUTER;
-    address public constant OPERATOR = 0x9Cb889A00dcA965D3276E8C5D5A5331b8FA4f089;
+    address public immutable OPERATOR;
 
     /* 
         Chainlink
@@ -89,6 +90,7 @@ contract RPSRaffle is
         nextPotTicketIdStart = 1; // first ticket of the first pot
         // roles
         ROUTER = params.router;
+        OPERATOR = params.operator;
         // chainlink
         callbackGasLimit = params.callbackGasLimit;
         VRF_CONFIRMATIONS = params.vrfConfirmations;
@@ -105,6 +107,8 @@ contract RPSRaffle is
 		uint256 _potLimit = potLimit;
 		uint256 _raffleTicketCost = raffleTicketCost;
         uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
+
+        protocolFeeAccumulated += msg.value - potValueDelta;
 
         _executeTrade(
             _amountInWei,
@@ -139,6 +143,8 @@ contract RPSRaffle is
 		uint256 _raffleTicketCost = raffleTicketCost;
         uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
         uint256 trades_n = trades.length;
+
+        protocolFeeAccumulated += msg.value - potValueDelta;
         
         /* 
             Execute trades
@@ -273,6 +279,15 @@ contract RPSRaffle is
             }
         }
         emit PrizeAmountsUpdated(_newPrizeAmounts);
+    }
+
+    function withdrawFee(address to) external onlyOwner {
+        uint256 _amount = protocolFeeAccumulated;
+        require(_amount > 0, "Nothing to withdraw");
+
+        protocolFeeAccumulated = 0;
+        (bool success,) = to.call{value: _amount}("");
+        require(success);
     }
 
     /* 

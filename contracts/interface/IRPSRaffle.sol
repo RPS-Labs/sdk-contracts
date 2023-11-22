@@ -18,6 +18,7 @@ interface IRPSRaffle {
         uint8 vrfConfirmations;
         address router;
         address owner;
+        address operator;
     }
 
     struct RequestStatus {

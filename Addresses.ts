@@ -16,3 +16,7 @@ export const LINK_WHALE: ChainIdToAddress = {
 export const ROUTER: ChainIdToAddress = {
   [Network.EthereumSepolia]: "set up router",
 }
+
+export const OPERATOR: ChainIdToAddress = {
+  [Network.Ethereum]: "0x9Cb889A00dcA965D3276E8C5D5A5331b8FA4f089"
+};

@@ -10,15 +10,16 @@ import { fundSubscription } from '../scripts/test/fundSubscription';
 import { deployRPSRaffle } from '../scripts/test/deployRPSRaffle';
 import { deployRPSRouter } from '../scripts/test/deployRPSRouter';
 import { dealLINKToAddress } from '../scripts/test/dealLinkToAddress';
-import { DefaultPRSRaffleParams, getRandomFloat } from '../utils/utils';
+import { DefaultPRSRaffleParams, DefaultRPSPrizeAmounts, getRandomFloat } from '../utils/utils';
 import { encodeStakingCall } from '../scripts/test/encodeStakingCall';
 import { applyTradeFee } from '../scripts/test/applyTradeFee';
 import { getProtocolFeeFromDelta } from '../scripts/test/getProtocolFee';
 import { calcPendingAmounts } from '../scripts/test/calcPendingAmount';
 import { tradeToFillPot } from '../scripts/test/tradeToFillPot';
 import { LINK } from '../Addresses';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
-describe("RPS Raffle", function() {
+describe("RPS Raffle", function () {
   async function deployAndConfigureVRFContracts(): Promise<{
     V3Aggregator: Contract,
     VRFCoordinator: Contract,
@@ -29,35 +30,38 @@ describe("RPS Raffle", function() {
     VRFCoordinator = await fundSubscription(VRFCoordinator);
 
     return {
-      V3Aggregator, 
+      V3Aggregator,
       VRFCoordinator,
       VRFV2Wrapper
     }
   }
 
   async function deployEverythingFixture(): Promise<{
-    V3Aggregator: Contract, 
-    VRFCoordinator: Contract, 
+    V3Aggregator: Contract,
+    VRFCoordinator: Contract,
     VRFV2Wrapper: Contract,
     RPSRaffle: Contract,
     RPSRouter: Contract,
-    Protocol: Contract
+    Protocol: Contract,
+    owner: SignerWithAddress,
+    operator: SignerWithAddress
   }> {
-    const { V3Aggregator, VRFCoordinator, VRFV2Wrapper } = 
+    const { V3Aggregator, VRFCoordinator, VRFV2Wrapper } =
       await deployAndConfigureVRFContracts();
 
     // Configure initilize parameters
     const params = DefaultPRSRaffleParams;
-    const [owner] = await ethers.getSigners();
+    const [owner, operator] = await ethers.getSigners();
 
     params.owner = await owner.getAddress();
+    params.operator = await operator.getAddress();
 
     // Deploy protocol
     const Protocol = await deployProtocol();
 
     // Deploy Router
     const RPSRouter = await deployTestRPSRouter(
-      Protocol.target.toString(), 
+      Protocol.target.toString(),
       params.owner
     );
     params.router = RPSRouter.target.toString();
@@ -70,13 +74,18 @@ describe("RPS Raffle", function() {
     // Fund raffle with LINK
     await dealLINKToAddress(RPSRaffle.target.toString(), 100);
 
+    // Set winning amounts
+    await RPSRaffle.updatePrizeAmounts(DefaultRPSPrizeAmounts);
+
     return {
       V3Aggregator,
       VRFCoordinator,
       VRFV2Wrapper,
       RPSRaffle,
       RPSRouter,
-      Protocol
+      Protocol,
+      owner,
+      operator
     };
   }
 
@@ -99,13 +108,13 @@ describe("RPS Raffle", function() {
 
   async function deployProtocol(): Promise<Contract> {
     const protocol = await ethers.deployContract("StakingMock");
-  
+
     await protocol.waitForDeployment();
 
     return protocol;
   }
 
-  it('Should execute the call', async function() {
+  it('Should execute the call', async function () {
     const {
       RPSRaffle,
       RPSRouter,
@@ -121,21 +130,21 @@ describe("RPS Raffle", function() {
     const data = encodeStakingCall(user_addr, staking_amount);
     const trade_amount = applyTradeFee(
       staking_amount,
-      default_raffle_params.tradeFeeInBps, 
+      default_raffle_params.tradeFeeInBps,
     );
 
     // Resetting ticket cost
     const new_ticket_cost = ethers.parseEther(getRandomFloat(0.01, 0.3).toFixed(5));
     await RPSRaffle.setRaffleTicketCost(new_ticket_cost);
 
-    await RPSRouter.execute(data, trade_amount, {value: trade_amount});
+    await RPSRouter.execute(data, trade_amount, { value: trade_amount });
 
     expect(await Protocol.staked(user_addr)).to.equal(
       staking_amount, "Staked amount is incorrect"
     );
   });
 
-  it('Two executions correctly update raffle data', async function() {
+  it('Two executions correctly update raffle data', async function () {
     const {
       RPSRaffle,
       RPSRouter,
@@ -154,12 +163,12 @@ describe("RPS Raffle", function() {
     const data1 = encodeStakingCall(user_addr, staking_amount1);
     const trade_amount1 = applyTradeFee(
       staking_amount1,
-      DefaultPRSRaffleParams.tradeFeeInBps, 
+      DefaultPRSRaffleParams.tradeFeeInBps,
     );
     const raffle_delta1 = trade_amount1 - staking_amount1;
 
     // @ts-ignore
-    await RPSRouter.connect(user).execute(data1, trade_amount1, {value: trade_amount1});
+    await RPSRouter.connect(user).execute(data1, trade_amount1, { value: trade_amount1 });
 
     /* 
 
@@ -170,12 +179,12 @@ describe("RPS Raffle", function() {
     const data2 = encodeStakingCall(user_addr, staking_amount2);
     const trade_amount2 = applyTradeFee(
       staking_amount2,
-      DefaultPRSRaffleParams.tradeFeeInBps, 
+      DefaultPRSRaffleParams.tradeFeeInBps,
     );
     const raffle_delta2 = trade_amount2 - staking_amount2;
 
     // @ts-ignore
-    await RPSRouter.connect(user).execute(data2, trade_amount2, {value: trade_amount2});
+    await RPSRouter.connect(user).execute(data2, trade_amount2, { value: trade_amount2 });
 
     // Checking state
     const scale = 10n ** 10n;
@@ -194,7 +203,7 @@ describe("RPS Raffle", function() {
     expect(await RPSRaffle.pendingAmounts(user_addr)).to.equal(expected_pending_amount, "Unexpected pending amount");
   });
 
-  it('Insufficient value reverts', async function() {
+  it('Insufficient value reverts', async function () {
     const {
       RPSRaffle,
       RPSRouter,
@@ -207,15 +216,93 @@ describe("RPS Raffle", function() {
     const data = encodeStakingCall(user_addr, staking_amount);
     const trade_amount = applyTradeFee(
       staking_amount,
-      DefaultPRSRaffleParams.tradeFeeInBps, 
+      DefaultPRSRaffleParams.tradeFeeInBps,
     );
 
     // @ts-ignore
-    const ex = RPSRouter.connect(user).execute(data, trade_amount, {value: trade_amount - 1n});
+    const ex = RPSRouter.connect(user).execute(data, trade_amount, { value: trade_amount - 1n });
     expect(ex).to.be.revertedWith("Insufficient funds");
   });
 
-  it('Should request Chainlink randomness when the pot is filled', async function () {
+  it('Restricted access should work', async function () {
+    const {
+      RPSRaffle,
+      RPSRouter,
+    } = await loadFixture(deployEverythingFixture);
+
+    const [, , user] = await ethers.getSigners();
+
+    /*
+    
+        CHECKING ACCESS CONTROL
+    
+     */
+    //@ts-ignore
+    expect(RPSRaffle.connect(user).executeRaffle([user])).to.be.revertedWith(
+      "Caller must be the operator"
+    );
+
+    const amount = ethers.parseEther("1.0");
+    const user_addr = await user.getAddress();
+    //@ts-ignore
+    expect(RPSRaffle.connect(user).executeTrade(amount, user_addr)).to.be.revertedWith(
+      "Unathorized call - not a router"
+    );
+
+    //@ts-ignore
+    expect(RPSRaffle.connect(user).setPotLimit(amount)).to.be.reverted;
+
+    //@ts-ignore
+    expect(RPSRouter.connect(user).migrateProtocol(user_addr)).to.be.reverted;
+  });
+
+  it('Owner can withdraw fees', async function () {
+    const {
+      RPSRaffle,
+      RPSRouter,
+      Protocol,
+      owner
+    } = await loadFixture(deployEverythingFixture);
+
+    /* 
+      SIMPLE TRADE
+    */
+    const [, , user] = await ethers.getSigners();
+    const user_addr = await user.getAddress();
+    const staking_amount = ethers.parseEther(getRandomFloat(0.01, 0.3).toFixed(5));
+    const data = encodeStakingCall(user_addr, staking_amount);
+    const trade_amount = applyTradeFee(
+      staking_amount,
+      DefaultPRSRaffleParams.tradeFeeInBps,
+    );
+
+    // @ts-ignore
+    await RPSRouter.connect(user).execute(
+      data,
+      trade_amount,
+      { value: trade_amount }
+    );
+
+    /* 
+      WITHDRAW FEE
+     */
+    const owner_addr = await owner.getAddress();
+    const raffle_delta = trade_amount - staking_amount;
+    const protocol_fee = getProtocolFeeFromDelta(raffle_delta);
+    // @ts-ignore
+    expect(RPSRaffle.connect(owner).withdrawFee(owner_addr)).to.changeEtherBalances(
+      [RPSRaffle.target, owner_addr],
+      [-protocol_fee, protocol_fee]
+    );
+
+    // Check currentPotSize
+    const expected_pot_size = raffle_delta - protocol_fee;
+    expect(await RPSRaffle.currentPotSize()).to.equal(expected_pot_size,
+      "Invalid pot size"
+    );
+  });
+
+  /* it('Should request Chainlink randomness when the pot is filled', async function () {
     const {
       RPSRaffle,
       RPSRouter,
@@ -231,7 +318,13 @@ describe("RPS Raffle", function() {
     expect(await RPSRaffle.requestIds(0)).to.equal(request_id, "Request ids array is not updated");
     [, request_created, ] = await RPSRaffle.chainlinkRequests(request_id);
     expect(request_created).to.equal(true, "Request status is not set to true");
-  });
+  }); */
 
-  // TODO try setters (randomized value)
+
+  // TODO test Chainlink request set
+  // TODO randomness fulfilled
+  // TODO execute raffle and claim 
+  // TODO test batch
+  // TODO withdraw fee test
+  // TODO setters
 });

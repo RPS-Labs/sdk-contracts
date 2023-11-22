@@ -10,5 +10,6 @@ export type RPSRaffleInitializeParams = {
   callbackGasLimit: BigNumberish,
   vrfConfirmations: number,
   router: string,
-  owner: string
+  owner: string,
+  operator: string
 }
