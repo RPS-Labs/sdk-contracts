@@ -6,6 +6,7 @@ import { OPERATOR } from './Addresses';
 /* 
   FILL IN DEPLOYMENT PARAMETERS
  */
+// for details refer to https://rpslabs.gitbook.io/docs/for-developers/smart-contracts/deployment-guide
 
 export const routerParams: RPSRouterParams = {
   owner: '',

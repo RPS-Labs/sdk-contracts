@@ -1,7 +1,7 @@
 ## RPS Labs SDK contracts
 Welcome to the comprehensive guide for deploying and configuring the smart contracts integral to the RPS Labs SDK.
 
-For detailed insights and additional information, please refer to the RPS Labs Smart Contract Documentation.
+For detailed insights and additional information, please refer to the RPS Labs Smart Contract Documentation https://rpslabs.gitbook.io/docs/for-developers/smart-contracts.
 
 ### Initial configuration
 
