@@ -8,8 +8,8 @@ import { OPERATOR } from './Addresses';
  */
 
 export const routerParams: RPSRouterParams = {
-  owner: '0xe2D3f8c3C5597736ea34F1A24C6D3C9000e9796e',
-  protocol: '0xDc03FE9D6f642e031e83162401F29040F882910F'
+  owner: '',
+  protocol: ''
 }
 
 export const raffleParams: RPSRaffleInitializeParams = {
@@ -21,7 +21,7 @@ export const raffleParams: RPSRaffleInitializeParams = {
   tradeFeeInBps: 1000n, // 10%
   callbackGasLimit: 250_000n,
   vrfConfirmations: CHAINLINK_VRF_CONFIRMATIONS[network.config.chainId!],
-  router: '0x2b416A200FFbCA827C0Bc26985a9ecb612E4B6eD',
-  owner: '0xe2D3f8c3C5597736ea34F1A24C6D3C9000e9796e',
+  router: '',
+  owner: '',
   operator: OPERATOR[network.config.chainId!]
 }
