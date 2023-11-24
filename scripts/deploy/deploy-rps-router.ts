@@ -22,6 +22,17 @@ const main = async () => {
 
   const deployer_addr = await deployer.getAddress();
   console.log(`RPS Router deployed at ${rps_router.target} by deployer ${deployer_addr}`)
+
+  // Verification
+  console.log("Verifying RPS Router...");
+  await new Promise((resolve) => setTimeout(resolve, 30000));
+  await hre.run("verify:verify", {
+    address: rps_router.target,
+    constructorArguments: [
+      params.owner,
+      params.protocol
+    ],
+  });
 }
 
 main()

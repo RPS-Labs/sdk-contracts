@@ -29,17 +29,31 @@ const main = async () => {
   validateRaffleParams(raffleParams);
 
   const [deployer] = await hre.ethers.getSigners();
+  const chainId = network.config.chainId!;
 
   const rps_raffle = await hre.ethers.deployContract("RPSRaffle", [
     raffleParams,
-    LINK[network.config.chainId!],
-    VRFV2Wrapper[network.config.chainId!]
+    LINK[chainId],
+    VRFV2Wrapper[chainId]
   // @ts-ignore
   ], deployer);
   await rps_raffle.waitForDeployment();
 
   const deployer_addr = await deployer.getAddress();
   console.log(`RPS Raffle deployed at ${rps_raffle.target} by deployer ${deployer_addr}`)  
+
+  // Verification
+  console.log("Verifying RPS Raffle...");
+  await new Promise((resolve) => setTimeout(resolve, 30000));
+  await hre.run("verify:verify", {
+    address: rps_raffle.target,
+    constructorArguments: [
+      raffleParams,
+      LINK[chainId],
+      VRFV2Wrapper[chainId]
+    ],
+  });
+  
 }
 
 main()

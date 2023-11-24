@@ -10,6 +10,13 @@ const main = async () => {
 
   const deployer_addr = await deployer.getAddress();
   console.log(`Staking protocol deployed at ${staking.target} by deployer ${deployer_addr}`);
+
+  // Verification
+  console.log("Verifying the contract...");
+  await hre.run("verify:verify", {
+    address: staking.target,
+    constructorArguments: [],
+  });
 }
 
 main()

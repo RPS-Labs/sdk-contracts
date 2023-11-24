@@ -190,7 +190,49 @@ const config: HardhatUserConfig = {
   },
 
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY
+    apiKey: process.env.ETHERSCAN_API_KEY,
+    customChains: [
+      {
+        network: "mantleTestnet",
+        chainId: 5001,
+        urls: {
+          apiURL: "https://explorer.testnet.mantle.xyz/api",
+          browserURL: "https://explorer.testnet.mantle.xyz",
+        },
+      },
+      {
+        network: "lineaTestnet",
+        chainId: 59140,
+        urls: {
+          apiURL: "https://explorer.goerli.linea.build/api",
+          browserURL: "https://explorer.goerli.linea.build",
+        },
+      },
+      {
+        network: "scrollAlpha",
+        chainId: 534353,
+        urls: {
+          apiURL: "https://blockscout.scroll.io/api",
+          browserURL: "https://blockscout.scroll.io/",
+        },
+      },
+      {
+        network: "ancient8Testnet",
+        chainId: 2863311531,
+        urls: {
+          apiURL: "https://testnet.a8scan.io/api",
+          browserURL: "https://testnet.a8scan.io/",
+        },
+      },
+      {
+        network: "zoraTestnet",
+        chainId: 999,
+        urls: {
+          apiURL: "https://testnet.explorer.zora.energy/api",
+          browserURL: "https://testnet.explorer.zora.energy/",
+        },
+      },
+    ]
   }
 }
 
