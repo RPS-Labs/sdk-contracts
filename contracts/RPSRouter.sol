@@ -24,7 +24,7 @@ contract RPSRouter is IRPSRouter, Ownable {
         uint16 raffleTradeFee = raffle.tradeFeeInBps();
         uint256 raffleDelta = tradeAmount * raffleTradeFee / HUNDRED_PERCENT;
         require(msg.value >= tradeAmount, "Insufficient funds");
-
+ 
         // Generating tickets
         raffle.executeTrade{ value: raffleDelta }(tradeAmount, msg.sender);
 

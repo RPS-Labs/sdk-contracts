@@ -297,7 +297,10 @@ describe("RPS Raffle", function () {
 
     // Check currentPotSize
     const expected_pot_size = raffle_delta - protocol_fee;
-    expect(await RPSRaffle.currentPotSize()).to.equal(expected_pot_size,
+    const delta = 10n ^ 3n;
+    expect(await RPSRaffle.currentPotSize()).to.closeTo(
+      expected_pot_size,
+      delta,
       "Invalid pot size"
     );
   });

@@ -13,3 +13,8 @@ export type RPSRaffleInitializeParams = {
   owner: string,
   operator: string
 }
+
+export type RPSRouterParams = {
+  owner: string,
+  protocol: string
+}

@@ -7,7 +7,7 @@ export enum Network {
   // Mainnets
   Ethereum = 1,
   Optimism = 10,
-  Bsc = 56,
+  Bnb = 56,
   Polygon = 137,
   Base = 8453,
   Arbitrum = 42161,
@@ -17,23 +17,47 @@ export enum Network {
   Zora = 7777777,
   PolygonZkevm = 1101,
   Scroll = 534352,
+  Fantom = 250,
   // Testnets
   EthereumGoerli = 5,
   ZoraTestnet = 999,
   MantleTestnet = 5001,
   LineaTestnet = 59140,
+  Fuji = 43113,
   Mumbai = 80001,
   BaseGoerli = 84531,
   ScrollAlpha = 534353,
   EthereumSepolia = 11155111,
   Zksync = 324,
   Ancient8Testnet = 2863311531,
-  HardhatNetwork = 31337
+  HardhatNetwork = 31337,
+  BnbTestnet = 97,
+  FantomTestnet = 4002,
+  ArbitrumSepolia = 421614,
 }
 
 export type ChainIdToAddress = { [chainId: number]: string };
 
+export type ChainIdToNumber = { [chainId: number]: number };
+
 export const HUNDRED_PERCENT = 10000n;
+
+export const CHAINLINK_VRF_CONFIRMATIONS: ChainIdToNumber = {
+  [Network.Ethereum]: 3,
+  [Network.EthereumSepolia]: 3,
+  [Network.EthereumGoerli]: 3,
+  [Network.Bnb]: 3,
+  [Network.BnbTestnet]: 3,
+  [Network.Polygon]: 10,
+  [Network.Mumbai]: 10,
+  [Network.Avalanche]: 1,
+  [Network.Fuji]: 1,
+  [Network.Fantom]: 1,
+  [Network.FantomTestnet]: 1,
+  [Network.Arbitrum]: 3,
+  [Network.ArbitrumSepolia]: 3,
+  [Network.HardhatNetwork]: 3
+}
 
 export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
   potLimit: ethers.parseEther("100.0"),
@@ -43,7 +67,7 @@ export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
   protocolFeeInBps: 1000n,
   tradeFeeInBps: 1000n,
   callbackGasLimit: 3_000_000,
-  vrfConfirmations: 1,
+  vrfConfirmations: CHAINLINK_VRF_CONFIRMATIONS[network.config.chainId!],
   router: AddressZero,
   owner: AddressZero,
   operator: AddressZero
