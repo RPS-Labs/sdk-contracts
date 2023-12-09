@@ -63,7 +63,6 @@ export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
   potLimit: ethers.parseEther("100.0"),
   raffleTicketCost: ethers.parseEther("0.1"),
   claimWindow: 24 * 60 * 60 * 7, // 7 days
-  numberOfWinners: 1,
   protocolFeeInBps: 1000n,
   tradeFeeInBps: 1000n,
   callbackGasLimit: 3_000_000,

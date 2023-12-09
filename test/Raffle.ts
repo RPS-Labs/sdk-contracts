@@ -18,6 +18,7 @@ import { calcPendingAmounts } from '../scripts/test/calcPendingAmount';
 import { tradeToFillPot } from '../scripts/test/tradeToFillPot';
 import { LINK } from '../Addresses';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { BatchTradeParams } from '../utils/types';
 
 describe("RPS Raffle", function () {
   async function deployAndConfigureVRFContracts(): Promise<{
@@ -75,7 +76,11 @@ describe("RPS Raffle", function () {
     await dealLINKToAddress(RPSRaffle.target.toString(), 100);
 
     // Set winning amounts
-    await RPSRaffle.updatePrizeAmounts(DefaultRPSPrizeAmounts);
+    const num_of_winners = 1;
+    await RPSRaffle.updatePrizeDistribution(
+      DefaultRPSPrizeAmounts,
+      num_of_winners
+    );
 
     return {
       V3Aggregator,
@@ -203,6 +208,69 @@ describe("RPS Raffle", function () {
     expect(await RPSRaffle.pendingAmounts(user_addr)).to.equal(expected_pending_amount, "Unexpected pending amount");
   });
 
+  it('Execute batch', async function () {
+    const {
+      RPSRaffle,
+      RPSRouter,
+      Protocol
+    } = await loadFixture(deployEverythingFixture);
+
+    const [owner, user, user2] = await ethers.getSigners();
+    const user_addr = await user.getAddress();
+    const user_2_addr = await user2.getAddress();
+
+    const staking_amount_1 = ethers.parseEther(getRandomFloat(1.3, 5).toFixed(5));
+    const staking_amount_2 = ethers.parseEther(getRandomFloat(0.7, 3).toFixed(5));
+    const total_staking_amount = staking_amount_1 + staking_amount_2;
+    const data = encodeStakingCall(user_addr, total_staking_amount);
+
+    const trade_amount1 = applyTradeFee(
+      staking_amount_1,
+      DefaultPRSRaffleParams.tradeFeeInBps,
+    );
+    const trade_amount2 = applyTradeFee(
+      staking_amount_2,
+      DefaultPRSRaffleParams.tradeFeeInBps,
+    );
+    const params: BatchTradeParams[] = [
+      {
+        tradeAmount: trade_amount1,
+        user: user_addr
+      },
+      {
+        tradeAmount: trade_amount2,
+        user: user_2_addr
+      }
+    ];
+
+    const eth_buffer = ethers.parseEther("0.4");
+    //@ts-ignore
+    await RPSRouter.connect(user).executeBatch(data, params, {
+      value: trade_amount1 + trade_amount2 + eth_buffer
+    });
+
+    /* 
+      CHECK STATE
+     */
+    const raffle_delta = trade_amount1 + trade_amount2 - total_staking_amount;
+    const scale = 10n ** 10n;
+    const protocol_fee_scaled = getProtocolFeeFromDelta(scale * raffle_delta);
+    const expected_pot_size_scaled = scale * raffle_delta - protocol_fee_scaled;
+    const expected_pending_amount_1 = await calcPendingAmounts(trade_amount1);
+    const expected_pending_amount_2 = await calcPendingAmounts(trade_amount2);
+
+    // Balances
+    const raffle_bal = await ethers.provider.getBalance(RPSRaffle.target);
+    expect(raffle_bal).to.equal(raffle_delta, "Raffle balance incorrect");
+
+    // State
+    const pot_size = await RPSRaffle.currentPotSize();
+    const delta = 10n ** 6n;
+    expect(pot_size).to.be.closeTo(expected_pot_size_scaled / scale, delta, "Pot size incorrect");
+    expect(await RPSRaffle.pendingAmounts(user_addr)).to.equal(expected_pending_amount_1, "Unexpected pending amount user 1");
+    expect(await RPSRaffle.pendingAmounts(user_2_addr)).to.equal(expected_pending_amount_2, "Unexpected pending amount user 2");
+  });
+
   it('Insufficient value reverts', async function () {
     const {
       RPSRaffle,
@@ -323,11 +391,8 @@ describe("RPS Raffle", function () {
     expect(request_created).to.equal(true, "Request status is not set to true");
   }); */
 
-
   // TODO test Chainlink request set
   // TODO randomness fulfilled
   // TODO execute raffle and claim 
-  // TODO test batch
-  // TODO withdraw fee test
   // TODO setters
 });

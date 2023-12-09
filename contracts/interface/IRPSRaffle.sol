@@ -11,7 +11,6 @@ interface IRPSRaffle {
         uint256 potLimit;
         uint256 raffleTicketCost;
         uint128 claimWindow;
-        uint16 numberOfWinners;
         uint16 protocolFeeInBps;
         uint16 tradeFeeInBps;
         uint32 callbackGasLimit;
@@ -49,8 +48,7 @@ interface IRPSRaffle {
         uint256 randomWord
     );
     event Claim(address indexed user, uint256 amount);
-    event PrizeAmountsUpdated(uint128[] _newPrizeAmounts);
-    event NumberOfWinnersUpdated(uint16 _nOfWinners);
+    event PrizeDistributionUpdated(uint128[] _newPrizeAmounts, uint16 newNumberOfWinners);
     event CallbackGasLimitUpdated(uint32 _callbackGasLimit);
     event PotLimitUpdated(uint256 newPotLimit);
     event TradeFeeUpdated(uint16 newTradeFee);
@@ -70,7 +68,10 @@ interface IRPSRaffle {
 
     function claim() external;
     function setTradeFee(uint16 _newTradeFee) external;
-    function updatePrizeAmounts(uint128[] memory _newPrizeAmounts) external;
+    function updatePrizeDistribution(
+        uint128[] memory _newPrizeAmounts,
+        uint16 _newNumberOfWinners
+    ) external;
     
     function tradeFeeInBps() external returns(uint16);
 }

@@ -21,7 +21,7 @@ contract RPSRaffle is
     uint16 public tradeFeeInBps; // the percent of a trade amount that goes to the pot as pure ether
     uint16 public numberOfWinners;
     uint16 public protocolFeeInBps; // 100 = 1%, 10000 = 100%;
-    uint128 private claimWindow;
+    uint128 private immutable claimWindow;
     uint256 private protocolFeeAccumulated;
 
     /* 
@@ -75,15 +75,13 @@ contract RPSRaffle is
     {
         require(params.tradeFeeInBps < MULTIPLIER, "Incorrect fee value");
         require(params.protocolFeeInBps < MULTIPLIER, "Incorrect fee value");
-        require(params.numberOfWinners > 0, "Must have at least 1 winner");
         require(params.claimWindow > 24 hours, "Claim window too short");
-        require(params.vrfConfirmations >= 1);
+        require(params.vrfConfirmations >= 1, "At least 1 vrf confirmation is required");
 
         // raffle params
         potLimit = params.potLimit;
         raffleTicketCost = params.raffleTicketCost;
         claimWindow = params.claimWindow;
-        numberOfWinners = params.numberOfWinners;
         protocolFeeInBps = params.protocolFeeInBps;
         tradeFeeInBps = params.tradeFeeInBps;
         // ids
@@ -101,10 +99,7 @@ contract RPSRaffle is
         address _user
     ) external payable onlyRouter whenNotPaused {
 		require(msg.value > 0, "No trade fee transferred (msg.value)");
-        uint256 potValueDelta = msg.value * 
-            (MULTIPLIER - protocolFeeInBps) / MULTIPLIER;
-        uint256 _currentPotSize = currentPotSize;
-		uint256 _potLimit = potLimit;
+        uint256 potValueDelta = _calculatePotValueDelta();
 		uint256 _raffleTicketCost = raffleTicketCost;
         uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
 
@@ -116,30 +111,17 @@ contract RPSRaffle is
             _raffleTicketCost
         );
 
-        /*
-            Request Chainlink random winners if the Pot is filled 
-         */
-		if(_currentPotSize + potValueDelta >= _potLimit) {
-            _finishRaffle(
-                potValueDelta, 
-                _lastRaffleTicketIdBefore,
-                _potLimit,
-                _currentPotSize
-            );
-        }
-		else {
-			currentPotSize += potValueDelta;
-		}
+        _checkRaffleFinality(
+            potValueDelta,
+            _lastRaffleTicketIdBefore
+        );
     }
 
     function batchExecuteTrade(
         BatchTradeParams[] memory trades
     ) external payable onlyRouter whenNotPaused {
         require(msg.value > 0, "No trade fee transferred (msg.value)");
-        uint256 potValueDelta = msg.value 
-            * (MULTIPLIER - protocolFeeInBps) / MULTIPLIER;
-        uint256 _currentPotSize = currentPotSize;
-		uint256 _potLimit = potLimit;
+        uint256 potValueDelta = _calculatePotValueDelta();
 		uint256 _raffleTicketCost = raffleTicketCost;
         uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
         uint256 trades_n = trades.length;
@@ -159,22 +141,11 @@ contract RPSRaffle is
                 );
             }
         }
-        
 
-        /*
-            Request Chainlink random winners if the Pot is filled 
-         */
-		if(_currentPotSize + potValueDelta >= _potLimit) {
-            _finishRaffle(
-                potValueDelta, 
-                _lastRaffleTicketIdBefore,
-                _potLimit,
-                _currentPotSize
-            );
-        }
-		else {
-			currentPotSize += potValueDelta;
-		}
+        _checkRaffleFinality(
+            potValueDelta,
+            _lastRaffleTicketIdBefore
+        );
     }
 
     function executeRaffle(
@@ -185,14 +156,15 @@ contract RPSRaffle is
         require(address(this).balance >= _potLimit, "The pot is not filled");
 
         uint sum = 0;
-        for(uint16 i; i < _winners.length; i++) {
+        for(uint16 i = 0; i < _winners.length; i++) {
             uint128 _prizeAmount = prizeAmounts[i];
             Prize storage userPrize = claimablePrizes[_winners[i]];
             userPrize.deadline = uint128(block.timestamp + claimWindow);
             userPrize.amount = userPrize.amount + _prizeAmount;
             sum += _prizeAmount;
         }
-        require(sum <= _potLimit);
+        require(sum <= _potLimit, 
+            "Insufficient funds for the current prize distribution");
 
         emit WinnersAssigned(_winners);
     }
@@ -229,6 +201,7 @@ contract RPSRaffle is
         require(raffleTicketCost != _newRaffleTicketCost, "Cost must be different");
         require(_newRaffleTicketCost > 0, "Raffle cost must be non-zero");
         raffleTicketCost = _newRaffleTicketCost;
+        emit RaffleTicketCostUpdated(_newRaffleTicketCost);
     }
 
     function setPotLimit(uint256 _newPotLimit) external onlyOwner {
@@ -256,29 +229,32 @@ contract RPSRaffle is
         emit CallbackGasLimitUpdated(_callbackGasLimit);
     }
 
-    function updateNumberOfWinners(uint16 _nOfWinners) 
-        external 
-        onlyOwner 
-    {
-        require(numberOfWinners != _nOfWinners, 
-            "Number of winners is currently the same");
-        require(numberOfWinners > 0, "Must have at least 1 winner");
-        numberOfWinners = _nOfWinners;
-        emit NumberOfWinnersUpdated(_nOfWinners);
-    }
-
-    function updatePrizeAmounts(uint128[] memory _newPrizeAmounts)
-        external 
-        onlyOwner 
-    {
-        require(_newPrizeAmounts.length == numberOfWinners, 
+    function updatePrizeDistribution(
+        uint128[] memory _newPrizeAmounts,
+        uint16 _newNumberOfWinners
+    ) external onlyOwner {
+        require(_newNumberOfWinners > 0, "Must have at least 1 winner");
+        require(_newPrizeAmounts.length == _newNumberOfWinners, 
             "Array length doesnt match the number of winners");
-        for (uint16 i = 0; i < _newPrizeAmounts.length; i++) {
+        for (uint16 i = 0; i < _newNumberOfWinners; i++) {
             if (prizeAmounts[i] != _newPrizeAmounts[i]) {
                 prizeAmounts[i] = _newPrizeAmounts[i];
             }
         }
-        emit PrizeAmountsUpdated(_newPrizeAmounts);
+
+        if (numberOfWinners != _newNumberOfWinners) {
+            numberOfWinners = _newNumberOfWinners;
+        }
+
+        emit PrizeDistributionUpdated(_newPrizeAmounts, _newNumberOfWinners);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function withdrawFee(address to) external onlyOwner {
@@ -287,7 +263,7 @@ contract RPSRaffle is
 
         protocolFeeAccumulated = 0;
         (bool success,) = to.call{value: _amount}("");
-        require(success);
+        require(success, "Failed transfer");
     }
 
     /* 
@@ -314,25 +290,27 @@ contract RPSRaffle is
         address _user,
         uint32 tickets 
     ) internal {
-        uint32 ticketIdStart;
-        uint32 ticketIdEnd;
+        uint32 ticketIdStart = 0;
+        uint32 ticketIdEnd = 0;
 
         /*
             Assigning newly generated ticket ranges 
         */
-       
-        if(tickets > 0) {
-            ticketIdStart = lastRaffleTicketId + 1;
-            ticketIdEnd = ticketIdStart + tickets - 1; 
+        if (tickets == 0) {
+            return;
         }
+       
+        ticketIdStart = lastRaffleTicketId + 1;
+        ticketIdEnd = ticketIdStart + tickets - 1; 
+
         lastRaffleTicketId += tickets;
 
         emit GenerateRaffleTickets(
-			_user, 
-			ticketIdStart, 
-			ticketIdEnd,
+            _user, 
+            ticketIdStart, 
+            ticketIdEnd,
             pendingAmounts[_user]
-		);
+        );
     }
 
     function _calculateTicketIdEnd(
@@ -353,18 +331,35 @@ contract RPSRaffle is
         return _lastRaffleTicketIdBefore + ticketsNeeded;
     }
 
+    function _calculatePotValueDelta() internal view returns(uint256) {
+        return msg.value * (MULTIPLIER - protocolFeeInBps) / MULTIPLIER;
+    }
+
+    function _checkRaffleFinality(
+        uint256 potValueDelta,
+        uint32 _lastRaffleTicketIdBefore
+    ) internal {
+        if(currentPotSize + potValueDelta >= potLimit) {
+            _finishRaffle(
+                potValueDelta, 
+                _lastRaffleTicketIdBefore
+            );
+        }
+		else {
+			currentPotSize += potValueDelta;
+		}
+    }
+
     function _finishRaffle(
         uint256 potValueDelta,
-        uint32 _lastRaffleTicketIdBefore,
-        uint256 _potLimit,
-        uint256 _currentPotSize
+        uint32 _lastRaffleTicketIdBefore
     ) internal {
         uint32 _potTicketIdEnd = _calculateTicketIdEnd(_lastRaffleTicketIdBefore);
         potTicketIdEnd = _potTicketIdEnd;
         potTicketIdStart = nextPotTicketIdStart; 
         nextPotTicketIdStart = _potTicketIdEnd + 1; // starting ticket of the next Pot
         // The remainder goes to the next pot
-        currentPotSize = (_currentPotSize + potValueDelta) % _potLimit; 
+        currentPotSize = (currentPotSize + potValueDelta) % potLimit;
         _requestRandomWinners();
     }
 

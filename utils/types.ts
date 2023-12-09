@@ -4,7 +4,6 @@ export type RPSRaffleInitializeParams = {
   potLimit: BigNumberish,
   raffleTicketCost: BigNumberish,
   claimWindow: number,
-  numberOfWinners: number,
   protocolFeeInBps: bigint,
   tradeFeeInBps: bigint,
   callbackGasLimit: BigNumberish,
@@ -17,4 +16,9 @@ export type RPSRaffleInitializeParams = {
 export type RPSRouterParams = {
   owner: string,
   protocol: string
+}
+
+export type BatchTradeParams = {
+  tradeAmount: BigNumberish;
+  user: string;
 }
