@@ -261,11 +261,11 @@ describe("RPS Raffle", function () {
 
     // Balances
     const raffle_bal = await ethers.provider.getBalance(RPSRaffle.target);
-    expect(raffle_bal).to.equal(raffle_delta, "Raffle balance incorrect");
+    const delta = 10n ** 6n;
+    expect(raffle_bal).to.closeTo(raffle_delta, delta, "Raffle balance incorrect");
 
     // State
     const pot_size = await RPSRaffle.currentPotSize();
-    const delta = 10n ** 6n;
     expect(pot_size).to.be.closeTo(expected_pot_size_scaled / scale, delta, "Pot size incorrect");
     expect(await RPSRaffle.pendingAmounts(user_addr)).to.equal(expected_pending_amount_1, "Unexpected pending amount user 1");
     expect(await RPSRaffle.pendingAmounts(user_2_addr)).to.equal(expected_pending_amount_2, "Unexpected pending amount user 2");

@@ -66,6 +66,11 @@ contract RPSRaffle is
         _;
     }
 
+    modifier nonZeroValue() {
+		require(msg.value > 0, "No trade fee transferred (msg.value)");
+        _;
+    }
+
     constructor(
         InitializeParams memory params,
         address _link, 
@@ -97,8 +102,7 @@ contract RPSRaffle is
     function executeTrade(
         uint256 _amountInWei, 
         address _user
-    ) external payable onlyRouter whenNotPaused {
-		require(msg.value > 0, "No trade fee transferred (msg.value)");
+    ) external payable onlyRouter whenNotPaused nonZeroValue {
         uint256 potValueDelta = _calculatePotValueDelta();
 		uint256 _raffleTicketCost = raffleTicketCost;
         uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
@@ -119,8 +123,7 @@ contract RPSRaffle is
 
     function batchExecuteTrade(
         BatchTradeParams[] memory trades
-    ) external payable onlyRouter whenNotPaused {
-        require(msg.value > 0, "No trade fee transferred (msg.value)");
+    ) external payable onlyRouter whenNotPaused nonZeroValue {
         uint256 potValueDelta = _calculatePotValueDelta();
 		uint256 _raffleTicketCost = raffleTicketCost;
         uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;

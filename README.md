@@ -63,5 +63,5 @@ npx ts-node .\scripts\deploy\deploy-rps-raffle.ts
 Once your contracts are successfully deployed, a few final steps are required to fully set them up:
 
 1. Call the `RPSRouter.setRaffleAddress()` function, passing the address of a recently deployed RPS Raffle contract. You can use Etherscan to do it.
-2. Call `RPSRaffle.updatePrizeAmounts()`, passing in an array of prize amounts in wei (1 ether = 10^18 wei) for each winner. This step is necessary only once unless there's a need to change the prize distribution in the future.
+2. Call `RPSRaffle.updatePrizeDistribution()`, passing in an array of prize amounts in wei (1 ether = 10^18 wei) and the number of winners.
 3. Fund your RPS Raffle contract with LINK tokens, which are required to run Chainlink VRF.
