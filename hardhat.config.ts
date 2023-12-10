@@ -127,13 +127,26 @@ const getNetworkConfig = (chainId?: number) => {
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.21",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 10000
-      }
-    }
+    compilers: [
+      {
+        version: "0.8.21",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 10000
+          }
+        }
+      },
+      {
+        version: "0.8.19",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 10000
+          }
+        }
+      }  
+    ]
   },
 
   //defaultNetwork: "sepolia",

@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.21;
+pragma solidity 0.8.19;
 
-import {IRPSRaffle} from "./interface/IRPSRaffle.sol";
-import {IRPSRouter} from "./interface/IRPSRouter.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IRPSRaffleNoVrf} from "../interface/IRPSRaffleNoVrf.sol";
+import {IRPSRouter} from "../interface/IRPSRouter.sol";
+import {Ownable} from "../OZx4/access/Ownable.sol";
 
-contract RPSRouter is IRPSRouter, Ownable {
+contract RPSRouterLinea is IRPSRouter, Ownable {
 
-    IRPSRaffle public raffle;
+    IRPSRaffleNoVrf public raffle;
     address public protocol;
     uint256 private constant HUNDRED_PERCENT = 10000;
 
-    constructor(address _owner, address _protocol) Ownable(_owner) {
+    constructor(address _owner, address _protocol) {
         protocol = _protocol;
+        _transferOwnership(_owner);
     }
 
     function execute(
@@ -34,7 +35,7 @@ contract RPSRouter is IRPSRouter, Ownable {
 
     function executeBatch(
         bytes calldata data,
-        IRPSRaffle.BatchTradeParams[] calldata params
+        IRPSRaffleNoVrf.BatchTradeParams[] calldata params
     ) external payable {
         // Validate value
         uint16 raffleTradeFee = raffle.tradeFeeInBps();
@@ -59,7 +60,7 @@ contract RPSRouter is IRPSRouter, Ownable {
     function setRaffleAddress(address _raffle) external onlyOwner {
         require(_raffle != address(0), "Zero address");
         require(address(raffle) == address(0), "RPS Raffle address can only be set once");
-        raffle = IRPSRaffle(_raffle);
+        raffle = IRPSRaffleNoVrf(_raffle);
     }
 
     function migrateProtocol(address _newProtocolAddress) external onlyOwner {
