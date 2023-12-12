@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
-import {IRPSRaffleNoVrf} from "../interface/IRPSRaffleNoVrf.sol";
+import {IRPSRaffleCustomVrf} from "../interface/IRPSRaffleCustomVrf.sol";
 import {Ownable} from "../OZx4/access/Ownable.sol";
 import {Pausable} from "../OZx4/security/Pausable.sol";
 
-contract RPSRaffleLinea is 
-    IRPSRaffleNoVrf, 
+contract RPSRaffleCustomVrf is 
+    IRPSRaffleCustomVrf, 
     Ownable,
     Pausable
 {

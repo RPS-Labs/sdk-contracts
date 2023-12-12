@@ -1,10 +1,10 @@
 import { Contract } from 'ethers';
 import { ethers, network } from 'hardhat';
 import { LINK } from '../../Addresses';
-import { RPSRaffleInitializeParams } from '../../utils/types';
+import { RPSRaffleInitializeParams, RPSRaffleCustomVrfInitializeParams, RPSRaffleArbitraryInitParams } from '../../utils/types';
 
 export async function deployRPSRaffle(
-  params: RPSRaffleInitializeParams,
+  params: RPSRaffleArbitraryInitParams,
   VRFV2Wrapper?: Contract
 ): Promise<Contract> {
   const chainId = network.config.chainId!;
@@ -19,7 +19,7 @@ export async function deployRPSRaffle(
     ]);
   }
   else {
-    rps_raffle = await ethers.deployContract("RPSRaffle", [params]);
+    rps_raffle = await ethers.deployContract("RPSRaffleCustomVrf", [params]);
   }
 
   await rps_raffle.waitForDeployment();

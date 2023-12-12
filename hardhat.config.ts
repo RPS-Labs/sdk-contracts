@@ -149,7 +149,7 @@ const config: HardhatUserConfig = {
     ]
   },
 
-  //defaultNetwork: "sepolia",
+  defaultNetwork: "lineaTestnet",
 
   networks: {
     hardhat: {
@@ -205,6 +205,14 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
     customChains: [
+      {
+        network: "linea",
+        chainId: 59144,
+        urls: {
+          browserURL: "https://lineascan.build",
+          apiURL: "https://api.lineascan.build/api"
+        }
+      },
       {
         network: "mantleTestnet",
         chainId: 5001,

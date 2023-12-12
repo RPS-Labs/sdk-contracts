@@ -1,5 +1,5 @@
 import { ethers, network } from 'hardhat';
-import { RPSRaffleInitializeParams } from './types';
+import { RPSRaffleInitializeParams, RPSRaffleCustomVrfInitializeParams } from './types';
 import { AddressZero } from "@ethersproject/constants";
 import { BigNumberish } from 'ethers';
 
@@ -75,6 +75,40 @@ export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
 export const DefaultRPSPrizeAmounts: Array<BigNumberish> = [
   DefaultPRSRaffleParams.potLimit
 ];
+
+export const DefaultPRSRaffleCustomVrfParams: RPSRaffleCustomVrfInitializeParams = {
+  potLimit: ethers.parseEther("100.0"),
+  raffleTicketCost: ethers.parseEther("0.1"),
+  claimWindow: 24 * 60 * 60 * 7, // 7 days
+  protocolFeeInBps: 1000n,
+  tradeFeeInBps: 1000n,
+  router: AddressZero,
+  owner: AddressZero,
+  operator: AddressZero
+}
+
+const ChainlinkVRFSupportedNetworks = [
+  Network.Ethereum,
+  Network.EthereumGoerli,
+  Network.EthereumSepolia,
+  Network.Bnb,
+  Network.BnbTestnet,
+  Network.Polygon,
+  Network.Mumbai,
+  Network.Avalanche,
+  Network.Fuji,
+  Network.Fantom,
+  Network.FantomTestnet,
+  Network.Arbitrum,
+  Network.ArbitrumSepolia,
+];
+
+export const isCustomVrfNetwork = (chainId: number) => {
+  if (!chainId) {
+    throw new Error("Chain id is invalid");
+  }
+  return !ChainlinkVRFSupportedNetworks.includes(chainId);
+}
 
 export const getRandomFloat = (min: number, max: number) => Math.random() * (max - min) + min;
 

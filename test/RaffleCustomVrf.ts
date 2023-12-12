@@ -4,60 +4,32 @@ import {
 import { expect, use } from "chai";
 import { Contract, Signer } from 'ethers';
 import { ethers, network } from "hardhat";
-import { deployVRFContracts } from '../scripts/test/deployMockVrfContracts';
-import { configureVRFV2Wrapper } from '../scripts/test/configureVrfWrapper';
-import { fundSubscription } from '../scripts/test/fundSubscription';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import { DefaultPRSRaffleCustomVrfParams, DefaultPRSRaffleParams, DefaultRPSPrizeAmounts, getRandomFloat, isCustomVrfNetwork } from '../utils/utils';
 import { deployRPSRaffle } from '../scripts/test/deployRPSRaffle';
 import { deployRPSRouter } from '../scripts/test/deployRPSRouter';
-import { dealLINKToAddress } from '../scripts/test/dealLinkToAddress';
-import { DefaultPRSRaffleParams, DefaultRPSPrizeAmounts, getRandomFloat, isCustomVrfNetwork } from '../utils/utils';
 import { encodeStakingCall } from '../scripts/test/encodeStakingCall';
 import { applyTradeFee } from '../scripts/test/applyTradeFee';
 import { getProtocolFeeFromDelta } from '../scripts/test/getProtocolFee';
 import { calcPendingAmounts } from '../scripts/test/calcPendingAmount';
-import { tradeToFillPot } from '../scripts/test/tradeToFillPot';
-import { LINK } from '../Addresses';
-import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import { BatchTradeParams } from '../utils/types';
-import 'dotenv/config';
+import { tradeToFillPot } from '../scripts/test/tradeToFillPot';
 
-if (isCustomVrfNetwork(Number(process.env.CHAIN_ID))) {
-  throw new Error("Cannot test regular raffle - this chain is not supported. Did you mean to run a signle-file test?");
+if (!isCustomVrfNetwork(Number(process.env.CHAIN_ID))) {
+  throw new Error("Cannot test custom vrf raffle - this chain is not supported. Did you mean to run a signle-file test?");
 }
 
-describe("RPS Raffle", function () {
-
-  async function deployAndConfigureVRFContracts(): Promise<{
-    V3Aggregator: Contract,
-    VRFCoordinator: Contract,
-    VRFV2Wrapper: Contract
-  }> {
-    let { V3Aggregator, VRFCoordinator, VRFV2Wrapper } = await deployVRFContracts();
-    VRFV2Wrapper = await configureVRFV2Wrapper(VRFV2Wrapper);
-    VRFCoordinator = await fundSubscription(VRFCoordinator);
-
-    return {
-      V3Aggregator,
-      VRFCoordinator,
-      VRFV2Wrapper
-    }
-  }
-
+describe('RPS Raffle (no Chainlink VRF)', async () => {
   async function deployEverythingFixture(): Promise<{
-    V3Aggregator: Contract,
-    VRFCoordinator: Contract,
-    VRFV2Wrapper: Contract,
     RPSRaffle: Contract,
     RPSRouter: Contract,
     Protocol: Contract,
     owner: SignerWithAddress,
     operator: SignerWithAddress
   }> {
-    const { V3Aggregator, VRFCoordinator, VRFV2Wrapper } =
-      await deployAndConfigureVRFContracts();
 
     // Configure initilize parameters
-    const params = DefaultPRSRaffleParams;
+    const params = DefaultPRSRaffleCustomVrfParams;
     const [owner, operator] = await ethers.getSigners();
 
     params.owner = await owner.getAddress();
@@ -73,13 +45,10 @@ describe("RPS Raffle", function () {
     );
     params.router = RPSRouter.target.toString();
 
-    const RPSRaffle = await deployRPSRaffle(params, VRFV2Wrapper);
+    const RPSRaffle = await deployRPSRaffle(params);
 
     // Set raffle
     await RPSRouter.setRaffleAddress(RPSRaffle.target);
-
-    // Fund raffle with LINK
-    await dealLINKToAddress(RPSRaffle.target.toString(), 100);
 
     // Set winning amounts
     const num_of_winners = 1;
@@ -89,9 +58,6 @@ describe("RPS Raffle", function () {
     );
 
     return {
-      V3Aggregator,
-      VRFCoordinator,
-      VRFV2Wrapper,
       RPSRaffle,
       RPSRouter,
       Protocol,
@@ -379,11 +345,11 @@ describe("RPS Raffle", function () {
     );
   });
 
-  /* it('Should request Chainlink randomness when the pot is filled', async function () {
+  it('Should request random number',async () => {
     const {
       RPSRaffle,
       RPSRouter,
-      Protocol
+      owner
     } = await loadFixture(deployEverythingFixture);
 
     const tx = tradeToFillPot(RPSRouter);
@@ -392,13 +358,110 @@ describe("RPS Raffle", function () {
     const request_id = await RPSRaffle.lastRequestId();
     let request_created;
     expect(request_id).to.not.equal(0, "Last request id is not set");
-    expect(await RPSRaffle.requestIds(0)).to.equal(request_id, "Request ids array is not updated");
-    [, request_created, ] = await RPSRaffle.chainlinkRequests(request_id);
+    [, request_created, ] = await RPSRaffle.randomnessRequests(request_id);
     expect(request_created).to.equal(true, "Request status is not set to true");
-  }); */
+  });
 
-  // TODO test Chainlink request set
-  // TODO randomness fulfilled
-  // TODO execute raffle and claim 
-  // TODO setters
+  it('Operator executes the raffle',async () => {
+    const {
+      RPSRaffle,
+      RPSRouter,
+      owner,
+      operator
+    } = await loadFixture(deployEverythingFixture);
+
+    await tradeToFillPot(RPSRouter);
+
+    const [,, alice, bob, vitalik, sbf] = await ethers.getSigners();
+
+    /* 
+      Update prize distribution
+     */
+    const n_of_winners = 4n;
+    const pot_limit = BigInt(DefaultPRSRaffleCustomVrfParams.potLimit);
+    const big_winning = pot_limit / 2n;
+    const mini_winning = pot_limit / 6n;
+    if (big_winning + mini_winning * (n_of_winners - 1n) > pot_limit) {
+      throw new Error("Winnings calculation error");
+    }
+
+    const winnings = new Array(Number(n_of_winners)).fill(mini_winning);
+    winnings[0] = big_winning;
+    // @ts-ignore
+    await RPSRaffle.connect(owner).updatePrizeDistribution(winnings, n_of_winners);
+    
+    /* 
+      Execute raffle
+     */
+    const winners = await Promise.all([alice, vitalik, bob, sbf].map(async (player) => {
+      return await player.getAddress()
+    }));
+
+    // @ts-ignore
+    await RPSRaffle.connect(operator).executeRaffle(winners);
+
+    const [
+      alice_winnings, 
+      bob_winnings, 
+      vitalik_winnings, 
+      sbf_winnings
+    ] = await Promise.all([alice, bob, vitalik, sbf].map(
+      async (player) => {
+        const [winning, deadline] = await RPSRaffle.claimablePrizes(await player.getAddress());
+        return winning;
+      }
+    ));
+
+    expect(alice_winnings).to.equal(
+      big_winning, "Incorrect Alice claimable amount"
+    );
+    expect(bob_winnings).to.equal(
+      mini_winning, "Incorrect Bob claimable amount"
+    );
+    expect(vitalik_winnings).to.equal(
+      mini_winning, "Incorrect Bob claimable amount"
+    );
+    expect(sbf_winnings).to.equal(
+      mini_winning, "Incorrect Bob claimable amount"
+    );
+  });
+
+  it('Winners should claim',async () => {
+    const {
+      RPSRaffle,
+      RPSRouter,
+      owner,
+      operator
+    } = await loadFixture(deployEverythingFixture);
+
+    await tradeToFillPot(RPSRouter);
+
+    const [,, alice, bob] = await ethers.getSigners();
+
+    /* 
+      Execute raffle
+    */
+    // @ts-ignore
+    await RPSRaffle.connect(operator).executeRaffle([await alice.getAddress()]);
+
+    /* 
+      Claiming
+     */
+    const winning = DefaultPRSRaffleCustomVrfParams.potLimit;
+
+    // @ts-ignore
+    expect(RPSRaffle.connect(bob).claim()).to.be.revertedWith(
+      "No available winnings"
+    );
+    // @ts-ignore
+    expect(RPSRaffle.connect(alice).claim()).to.changeEtherBalances(
+      [RPSRaffle.target, await alice.getAddress()],
+      [-winning, winning]
+    );
+    // @ts-ignore
+    expect(RPSRaffle.connect(alice).claim()).to.be.revertedWith(
+      "No available winnings"
+    );
+  });
+
 });

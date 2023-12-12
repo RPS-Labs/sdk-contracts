@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-interface IRPSRaffleNoVrf {
+interface IRPSRaffleCustomVrf {
     struct Prize {
         uint128 amount;
         uint128 deadline;

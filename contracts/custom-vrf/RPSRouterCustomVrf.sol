@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 
-import {IRPSRaffleNoVrf} from "../interface/IRPSRaffleNoVrf.sol";
+import {IRPSRaffleCustomVrf} from "../interface/IRPSRaffleCustomVrf.sol";
 import {IRPSRouter} from "../interface/IRPSRouter.sol";
 import {Ownable} from "../OZx4/access/Ownable.sol";
 
-contract RPSRouterLinea is IRPSRouter, Ownable {
+contract RPSRouterCustomVrf is IRPSRouter, Ownable {
 
-    IRPSRaffleNoVrf public raffle;
+    IRPSRaffleCustomVrf public raffle;
     address public protocol;
     uint256 private constant HUNDRED_PERCENT = 10000;
 
@@ -35,7 +35,7 @@ contract RPSRouterLinea is IRPSRouter, Ownable {
 
     function executeBatch(
         bytes calldata data,
-        IRPSRaffleNoVrf.BatchTradeParams[] calldata params
+        IRPSRaffleCustomVrf.BatchTradeParams[] calldata params
     ) external payable {
         // Validate value
         uint16 raffleTradeFee = raffle.tradeFeeInBps();
@@ -60,7 +60,7 @@ contract RPSRouterLinea is IRPSRouter, Ownable {
     function setRaffleAddress(address _raffle) external onlyOwner {
         require(_raffle != address(0), "Zero address");
         require(address(raffle) == address(0), "RPS Raffle address can only be set once");
-        raffle = IRPSRaffleNoVrf(_raffle);
+        raffle = IRPSRaffleCustomVrf(_raffle);
     }
 
     function migrateProtocol(address _newProtocolAddress) external onlyOwner {

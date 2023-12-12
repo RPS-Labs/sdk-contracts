@@ -1,6 +1,7 @@
-import hre from 'hardhat';
+import hre, { network } from 'hardhat';
 import { routerParams } from '../../deployment-params';
 import '@nomiclabs/hardhat-ethers';
+import { isCustomVrfNetwork } from '../../utils/utils';
 
 
 const main = async () => {
@@ -14,10 +15,18 @@ const main = async () => {
   }
 
   const [deployer] = await hre.ethers.getSigners();
+  const constructor_args = [params.owner, params.protocol];
+  let rps_router;
 
-  // @ts-ignore
-  const rps_router = await hre.ethers.deployContract("RPSRouter", [params.owner, params.protocol], deployer);
-
+  if (isCustomVrfNetwork(network.config.chainId!)) {
+    // @ts-ignore
+    rps_router = await hre.ethers.deployContract("RPSRouterCustomVrf", constructor_args, deployer);
+  }
+  else {
+    // @ts-ignore
+    rps_router = await hre.ethers.deployContract("RPSRouter", constructor_args, deployer);
+  }
+  
   await rps_router.waitForDeployment();
 
   const deployer_addr = await deployer.getAddress();
@@ -28,10 +37,7 @@ const main = async () => {
   await new Promise((resolve) => setTimeout(resolve, 30000));
   await hre.run("verify:verify", {
     address: rps_router.target,
-    constructorArguments: [
-      params.owner,
-      params.protocol
-    ],
+    constructorArguments: constructor_args,
   });
 }
 
