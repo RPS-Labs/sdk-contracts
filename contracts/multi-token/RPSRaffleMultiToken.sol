@@ -1,3 +1,7 @@
+/* 
+    TODO [WIP]
+ */
+
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
 import {IRPSRaffleMultiToken} from "./IRPSRaffleMultiToken.sol";
@@ -26,16 +30,16 @@ contract RPSRaffleMultiToken is
     uint16 public tradeFeeInBps; // the percent of the swap amount that goes to the pot
     uint16 public protocolFeeInBps; // 100 = 1%, 10000 = 100%;
     uint128 private immutable claimWindow;
-    EnumerableSet private approvedTokens;
+    EnumerableSet.AddressSet private approvedTokens;
 
     /* 
         Mappings
      */
     //mapping(address => AggregatorV3Interface) public chainlinkUSDPair; // token => pair
-    mapping(uint16 => EnumerableMap.AddressToUintMap) public potFunds; // potId => token => balance
-    mapping(address => EnumerableMap.AddressToUintMap) public claimablePrizes; // user -> token -> amount
+    mapping(uint16 => EnumerableMap.AddressToUintMap) internal potFunds; // potId => token => balance
+    mapping(address => EnumerableMap.AddressToUintMap) internal claimablePrizes; // user -> token -> amount
     mapping(address => uint32) public claimDeadlines; // user -> deadline
-    mapping(uint16 => uint32[]) public winningTicketIds;
+    mapping(uint16 => uint32) public winningTicketIds;
     mapping(address => uint256) public pendingAmountsUSD; // user -> value
     EnumerableMap.AddressToUintMap private protocolFeesAccumulated; // token => accumulated fees
     mapping(uint256 => RequestStatus) public randomnessRequests;
@@ -61,7 +65,7 @@ contract RPSRaffleMultiToken is
      */
     uint256 constant MULTIPLIER = 10000;
     uint8 constant internal USD_DECIMALS = 8;
-    FeedRegistryInterface immutable internal priceFeedRegistry;
+    FeedRegistryInterface immutable internal priceFeedRegistry; // TODO remove registry since its only on mainnet. Add price feeds configuration
 
     modifier onlyRouter() {
         require(msg.sender == ROUTER, "Unathorized call - not a router");
@@ -142,12 +146,12 @@ contract RPSRaffleMultiToken is
             /* uint80 roundID */,
             int256 answer,
             /* uint256 startedAt */,
-            uint256 updatedAt
+            uint256 updatedAt,
             /* uint80 answeredInRound */
         ) = getLatestRoundForTokenUSDPair(token);
         _validateFeedData(token, answer, updatedAt);
 
-        uint256 tradeAmountUSD = inputAmount * answer;
+        uint256 tradeAmountUSD = inputAmount * uint256(answer);
 
         _executeTrade(
             tradeAmountUSD,
@@ -155,7 +159,7 @@ contract RPSRaffleMultiToken is
             raffleTicketCostUSD
         );
 
-        protocolFeesAccumulated[token] = _calculateProtocolFee(inputAmount);
+        _addProtocolFee(_calculateProtocolFee(inputAmount));
         _addFunds(token, inputAmount);
 
         uint256 currentPotSizeUSD = _calculatePotSizeUSD(token, answer);
@@ -163,43 +167,23 @@ contract RPSRaffleMultiToken is
     }
 
     function executeRaffle(
-        address[] calldata _winners
+        address winner
     ) external onlyOperator {
-        uint _potLimit = potLimit;
-        require(_winners.length == numberOfWinners, "Must be equal to numberofWinners");
-        require(address(this).balance >= _potLimit, "The pot is not filled");
+        uint _potLimit = potLimitUSD;
 
-        uint sum = 0;
-        for(uint16 i = 0; i < _winners.length; i++) {
-            uint128 _prizeAmount = prizeAmounts[i];
-            Prize storage userPrize = claimablePrizes[_winners[i]];
-            userPrize.deadline = uint128(block.timestamp + claimWindow);
-            userPrize.amount = userPrize.amount + _prizeAmount;
-            sum += _prizeAmount;
-        }
-        require(sum <= _potLimit, 
-            "Insufficient funds for the current prize distribution");
+        // TODO set claimablePrizes for the user for each token. Use funds of the previous raffle
 
-        emit WinnersAssigned(_winners);
+        emit WinnerAssigned(winner);
     }
 
     function claim() external whenNotPaused {
         address payable user = payable(msg.sender);
-        Prize memory prize = claimablePrizes[user];
-        require(prize.amount > 0, "No available winnings");
-        require(block.timestamp < prize.deadline, "Claim window is closed");
-
-        claimablePrizes[user].amount = 0; 
-        user.transfer(prize.amount);
-        emit Claim(user, prize.amount);
+        // TODO iterate  and transfer all claimable tokens. Might be ether as well
+        // TODO emit event for each token
+        //emit Claim(user);
     }
 
-    function canClaim(address user) external view returns(bool) {
-        Prize memory prize = claimablePrizes[user];
-        return prize.amount > 0 && block.timestamp < prize.deadline;
-    }
-
-    function getWinningTicketIds(uint16 _potId) external view returns(uint32[] memory) {
+    function getWinningTicketIds(uint16 _potId) external view returns(uint32) {
         return winningTicketIds[_potId];
     }
 
@@ -219,6 +203,8 @@ contract RPSRaffleMultiToken is
         return priceFeedRegistry.latestRoundData(token, Denominations.USD);
     }
 
+    // TODO add claimablePrizes and raffleFunds getters
+
     /* 
 
         ***
@@ -228,9 +214,9 @@ contract RPSRaffleMultiToken is
      */
 
     function setRaffleTicketCost(uint256 _newRaffleTicketCost) external onlyOwner {
-        require(raffleTicketCost != _newRaffleTicketCost, "Cost must be different");
+        require(raffleTicketCostUSD != _newRaffleTicketCost, "Cost must be different");
         require(_newRaffleTicketCost > 0, "Raffle cost must be non-zero");
-        raffleTicketCost = _newRaffleTicketCost;
+        raffleTicketCostUSD = _newRaffleTicketCost;
         emit RaffleTicketCostUpdated(_newRaffleTicketCost);
     }
 
@@ -271,7 +257,7 @@ contract RPSRaffleMultiToken is
             token = tokens[i];
             _amount = protocolFeesAccumulated.get(token);
             if (_amount > 0) {
-                protocolFeesAccumulated[token] = 0;
+                protocolFeesAccumulated.set(token, 0);
                 IERC20(token).safeTransfer(to, _amount);
             }
         }
@@ -305,11 +291,15 @@ contract RPSRaffleMultiToken is
         (bool exists, uint256 tokenFunds) = funds.tryGet(token);
 
         if (exists) {
-            funds.set(tokenFunds + tokenAmount);
+            funds.set(token, tokenFunds + tokenAmount);
         }
         else {
-            funds.set(tokenAmount);
+            funds.set(token, tokenAmount);
         }
+    }
+
+    function _addProtocolFee(uint256 feeDelta) internal {
+        // TODO accumulate protocol fee
     }
     
     function _generateTickets( // @audit-ok
@@ -347,7 +337,7 @@ contract RPSRaffleMultiToken is
     }
 
     function _calculateProtocolFee(uint256 inputTokenAmount) internal view returns(uint256) {
-        return inputTokenAmount * protocolFeeInBps / HUNDRED_PERCENT;
+        return inputTokenAmount * protocolFeeInBps / MULTIPLIER;
     }
 
     function _checkRaffleFinality(uint256 currentPotSizeUSD) internal {
@@ -383,17 +373,18 @@ contract RPSRaffleMultiToken is
                 answer = inputTokenPriceToUSD;
             }
             else {
+                uint256 updatedAt;
                 (
                     /* uint80 roundID */,
                     answer,
                     /* uint256 startedAt */,
-                    uint256 updatedAt
+                    updatedAt,
                     /* uint80 answeredInRound */
                 ) = getLatestRoundForTokenUSDPair(token);
                 _validateFeedData(token, answer, updatedAt);
             }
 
-            currentPotSizeUSD += token_amount * answer;
+            currentPotSizeUSD += token_amount * uint256(answer);
         }
     }
 
@@ -429,7 +420,7 @@ contract RPSRaffleMultiToken is
     }
 
     function fulfillRandomWords(
-        uint256 randomWord
+        uint256 salt
     ) external onlyOperator {
         uint256 _lastRequestId = lastRequestId;
         RequestStatus memory lastRequest = randomnessRequests[_lastRequestId];
@@ -443,27 +434,15 @@ contract RPSRaffleMultiToken is
         randomnessRequests[_lastRequestId] = RequestStatus({
             fullfilled: true,
             exists: true,
-            randomWord: randomWord
+            randomWord: salt
         });
 
-        uint256 n_winners = numberOfWinners;
-        uint32[] memory derivedRandomWords = new uint32[](n_winners);
-        derivedRandomWords[0] = _normalizeValueToRange(randomWord, rangeFrom, rangeTo);
-        uint256 nextRandom;
-        uint32 nextRandomNormalized;
-        for (uint256 i = 1; i < n_winners; i++) {
-            nextRandom = uint256(keccak256(abi.encode(randomWord, i)));
-            nextRandomNormalized = _normalizeValueToRange(nextRandom, rangeFrom, rangeTo);
-            derivedRandomWords[i] = _incrementRandomValueUntilUnique(
-                nextRandomNormalized,
-                derivedRandomWords,
-                rangeFrom,
-                rangeTo
-            );
-        }
+        // TODO random number from salt
+        uint256 randomWord; 
+        uint32 winningTicket = _normalizeValueToRange(randomWord, rangeFrom, rangeTo);
 
-        uint256 prevPotId = currentPotId - 1;
-        winningTicketIds[prevPotId] = derivedRandomWords;
+        uint16 prevPotId = currentPotId - 1;
+        winningTicketIds[prevPotId] = winningTicket;
         emit RandomnessFulfilled(prevPotId, randomWord);
     }
 

@@ -354,7 +354,7 @@ contract RPSRaffleCustomVrf is
     }
 
     function fulfillRandomWords(
-        uint256 randomWord
+        uint256 salt
     ) external onlyOperator {
         uint256 _lastRequestId = lastRequestId;
         RequestStatus memory lastRequest = randomnessRequests[_lastRequestId];
@@ -368,11 +368,12 @@ contract RPSRaffleCustomVrf is
         randomnessRequests[_lastRequestId] = RequestStatus({
             fullfilled: true,
             exists: true,
-            randomWord: randomWord
+            randomWord: salt
         });
 
         uint256 n_winners = numberOfWinners;
         uint32[] memory derivedRandomWords = new uint32[](n_winners);
+        uint256 randomWord = _generateRandomFromSalt(salt);
         derivedRandomWords[0] = _normalizeValueToRange(randomWord, rangeFrom, rangeTo);
         uint256 nextRandom;
         uint32 nextRandomNormalized;
@@ -390,6 +391,10 @@ contract RPSRaffleCustomVrf is
         winningTicketIds[currentPotId] = derivedRandomWords;
         emit RandomnessFulfilled(currentPotId, randomWord);
         currentPotId++;
+    }
+
+    function _generateRandomFromSalt(uint256 _salt) internal view returns(uint256 _random) {
+        return uint256(keccak256(abi.encode(_salt, block.timestamp)));
     }
 
     function _normalizeValueToRange(

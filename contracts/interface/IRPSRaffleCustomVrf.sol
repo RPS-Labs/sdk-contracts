@@ -62,6 +62,7 @@ interface IRPSRaffleCustomVrf {
     ) external payable;
 
     function executeRaffle(address[] calldata _winners) external;
+    function fulfillRandomWords(uint256 salt) external;
 
     function claim() external;
     function setTradeFee(uint16 _newTradeFee) external;
