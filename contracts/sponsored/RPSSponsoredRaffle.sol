@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
-import {IRPSSponsoredRaffle} from "../interface/IRPSSponsoredRaffle.sol";
+import {IRPSSponsoredRaffle} from "./IRPSSponsoredRaffle.sol";
 import {VRFV2WrapperConsumerBase} from "@chainlink/contracts/src/v0.8/vrf/VRFV2WrapperConsumerBase.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
@@ -21,10 +21,9 @@ contract RPSSponsoredRaffle is
     uint256 public potLimit;
     uint256 public sponsoredAmount;
     uint16 public currentPotId;
-    uint16 public numberOfWinners;
     uint32 public rafflePeriod;
     uint32 public raffleEndTime;
-    IERC20 public immutable raffleToken;
+    IERC20 public immutable sponsoredToken;
     uint128 private immutable claimWindow;
 
     /* 
@@ -32,8 +31,7 @@ contract RPSSponsoredRaffle is
      */
     mapping(address => Prize) public claimablePrizes;
     mapping(uint256 => RequestStatus) public chainlinkRequests;
-    mapping(uint16 => uint32[]) public winningTicketIds;
-    mapping(uint16 => uint128) public prizeAmounts;  // winner id => prize amount. For example, first winner gets 5ETH, second winner - 1 ETH, etc.
+    mapping(uint16 => uint32) public winningTicketIds; // potId -> winning ticket
     mapping(address => uint256) public pendingAmounts;
 
     /* 
@@ -90,7 +88,7 @@ contract RPSSponsoredRaffle is
         raffleTicketCost = params.raffleTicketCost;
         rafflePeriod = params.rafflePeriod;
         claimWindow = params.claimWindow;
-        raffleToken = IERC20(params.raffleToken);
+        sponsoredToken = IERC20(params.sponsoredToken);
         potLimit = params.potLimit;
         
         // ids
@@ -106,7 +104,7 @@ contract RPSSponsoredRaffle is
     function startRaffle() external onlyOwner {
         require(raffleEndTime == 0, "You've already started the raffle");
         require(sponsoredAmount >= potLimit, "You must fully sponsor the raffle before starting it");
-        raffleEndTime = block.timestamp + rafflePeriod;
+        raffleEndTime = uint32(block.timestamp) + rafflePeriod;
         emit RaffleStarted(raffleEndTime);
     } 
     
@@ -114,38 +112,10 @@ contract RPSSponsoredRaffle is
         uint256 _amountInWei, 
         address _user
     ) external onlyRouter whenNotPaused raffleStarted {
-		uint256 _raffleTicketCost = raffleTicketCost;
-        uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
-
         _executeTrade(
             _amountInWei,
-            _user,
-            _raffleTicketCost
+            _user
         );
-
-        _checkRaffleFinality();
-    }
-
-    function batchExecuteTrade(
-        BatchTradeParams[] memory trades
-    ) external onlyRouter whenNotPaused raffleStarted {
-		uint256 _raffleTicketCost = raffleTicketCost;
-        uint32 _lastRaffleTicketIdBefore = lastRaffleTicketId;
-        uint256 trades_n = trades.length;
-        
-        /* 
-            Execute trades
-         */
-        {
-            for(uint256 i = 0; i < trades_n; i++) {
-                BatchTradeParams memory trade = trades[i];
-                _executeTrade(
-                    trade.tradeAmount,
-                    trade.user,
-                    _raffleTicketCost
-                );
-            }
-        }
 
         _checkRaffleFinality();
     }
@@ -153,30 +123,22 @@ contract RPSSponsoredRaffle is
     function sponsorRaffle(uint256 amount) external {
         require(amount > 0, "The donation must be non-zero");
 
-        raffleToken.safeTransferFrom(msg.sender, address(this), amount);
+        sponsoredToken.safeTransferFrom(msg.sender, address(this), amount);
         sponsoredAmount += amount;
     }
 
     function executeRaffle(
-        address[] calldata _winners
+        address winner
     ) external onlyOperator {
         uint _potLimit = potLimit;
-        require(_winners.length == numberOfWinners, "Must be equal to numberofWinners");
-        require(raffleToken.balanceOf(address(this)) >= _potLimit, 
+        require(sponsoredToken.balanceOf(address(this)) >= _potLimit, 
             "Not enough funds to draw the pot");
 
-        uint sum = 0;
-        for(uint16 i = 0; i < _winners.length; i++) {
-            uint128 _prizeAmount = prizeAmounts[i];
-            Prize storage userPrize = claimablePrizes[_winners[i]];
-            userPrize.deadline = uint128(block.timestamp + claimWindow);
-            userPrize.amount = userPrize.amount + _prizeAmount;
-            sum += _prizeAmount;
-        }
-        require(sum <= _potLimit, 
-            "Insufficient funds for the current prize distribution");
+        Prize storage userPrize = claimablePrizes[winner];
+        userPrize.deadline = uint128(block.timestamp + claimWindow);
+        userPrize.amount = userPrize.amount + uint128(_potLimit);
 
-        emit WinnersAssigned(_winners);
+        emit WinnerAssigned(winner);
     }
 
     function claim() external whenNotPaused {
@@ -186,7 +148,7 @@ contract RPSSponsoredRaffle is
         require(block.timestamp < prize.deadline, "Claim window is closed");
 
         claimablePrizes[user].amount = 0; 
-        raffleToken.safeTransfer(user, prize.amount);
+        sponsoredToken.safeTransfer(user, prize.amount);
 
         emit Claim(user, prize.amount);
     }
@@ -196,7 +158,7 @@ contract RPSSponsoredRaffle is
         return prize.amount > 0 && block.timestamp < prize.deadline;
     }
 
-    function getWinningTicketIds(uint16 _potId) external view returns(uint32[] memory) {
+    function getWinningTicketIds(uint16 _potId) external view returns(uint32) {
         return winningTicketIds[_potId];
     }
 
@@ -234,28 +196,6 @@ contract RPSSponsoredRaffle is
         emit RafflePeriodUpdated(newPeriod);
     }
 
-    function updatePrizeDistribution(
-        uint128[] memory _newPrizeAmounts,
-        uint16 _newNumberOfWinners
-    ) external onlyOwner {
-        require(_newNumberOfWinners > 0, "Must have at least 1 winner");
-        require(_newPrizeAmounts.length == _newNumberOfWinners, 
-            "Array length doesnt match the number of winners");
-        for (uint16 i = 0; i < _newNumberOfWinners; i++) {
-            uint128 _prizeAmount = _newPrizeAmounts[i];
-            require(_prizeAmount > 0, "Zero prize amount");
-            if (prizeAmounts[i] != _prizeAmount) {
-                prizeAmounts[i] = _prizeAmount;
-            }
-        }
-
-        if (numberOfWinners != _newNumberOfWinners) {
-            numberOfWinners = _newNumberOfWinners;
-        }
-
-        emit PrizeDistributionUpdated(_newPrizeAmounts, _newNumberOfWinners);
-    }
-
     function pause() external onlyOwner {
         _pause();
     }
@@ -273,9 +213,9 @@ contract RPSSponsoredRaffle is
 
     function _executeTrade(
         uint256 _amountInWei, 
-        address _user, 
-        uint256 _raffleTicketCost
+        address _user
     ) internal {
+        uint256 _raffleTicketCost = raffleTicketCost;
         uint256 _userPendingAmount = pendingAmounts[_user];
         uint32 tickets = uint32((_userPendingAmount + _amountInWei) / _raffleTicketCost);      
 
@@ -331,7 +271,8 @@ contract RPSSponsoredRaffle is
         nextPotTicketIdStart = _lastTicket + 1; // starting ticket of the next Pot
 
         sponsoredAmount -= potLimit;
-        raffleEndTime = block.timestamp + rafflePeriod;
+        raffleEndTime = uint32(block.timestamp) + rafflePeriod;
+        currentPotId++;
         _requestRandomWinners();
     }
 
@@ -359,56 +300,16 @@ contract RPSSponsoredRaffle is
             randomWord: randomWord
         });
 
-        uint256 n_winners = numberOfWinners;
-        uint32[] memory derivedRandomWords = new uint32[](n_winners);
-        derivedRandomWords[0] = _normalizeValueToRange(randomWord, rangeFrom, rangeTo);
-        uint256 nextRandom;
-        uint32 nextRandomNormalized;
-        for (uint256 i = 1; i < n_winners; i++) {
-            nextRandom = uint256(keccak256(abi.encode(randomWord, i)));
-            nextRandomNormalized = _normalizeValueToRange(nextRandom, rangeFrom, rangeTo);
-            derivedRandomWords[i] = _incrementRandomValueUntilUnique(
-                nextRandomNormalized,
-                derivedRandomWords,
-                rangeFrom,
-                rangeTo
-            );
-        }
+        uint32 winningTicket = _normalizeValueToRange(randomWord, rangeFrom, rangeTo);
 
-        winningTicketIds[currentPotId] = derivedRandomWords;
-        emit RandomnessFulfilled(currentPotId, randomWord);
-        currentPotId++;
+        uint16 prevPotId = currentPotId - 1;
+        winningTicketIds[prevPotId] = winningTicket;
+        emit RandomnessFulfilled(prevPotId, randomWord);
     }
 
     function _normalizeValueToRange(
         uint256 _value, uint32 _rangeFrom, uint32 _rangeTo
     ) internal pure returns(uint32 _scaledValue) {
         _scaledValue = uint32(_value) % (_rangeTo - _rangeFrom) + _rangeFrom; // from <= x <= to
-    }
-
-    function _incrementRandomValueUntilUnique(
-        uint32 _random, 
-        uint32[] memory _randomWords, 
-        uint32 _rangeFrom,
-        uint32 _rangeTo
-    ) internal pure returns(uint32 _uniqueRandom) {
-        _uniqueRandom = _random;
-        for(uint i = 0; i < _randomWords.length;) {
-            if(_uniqueRandom == _randomWords[i]) {
-                unchecked {
-                    _uniqueRandom = _normalizeValueToRange(
-                        _uniqueRandom + 1,
-                        _rangeFrom,
-                        _rangeTo
-                    );
-                    i = 0;
-                }
-            }
-            else {
-                unchecked {
-                    i++;
-                }
-            }
-        }
     }
 }

@@ -14,7 +14,7 @@ interface IRPSSponsoredRaffle {
         uint128 claimWindow;
         uint32 callbackGasLimit;
         uint8 vrfConfirmations;
-        address raffleToken;
+        address sponsoredToken;
         address router;
         address owner;
         address operator;
@@ -37,7 +37,7 @@ interface IRPSSponsoredRaffle {
 		uint32 ticketIdEnd,
 		uint256 pendingAmount
 	);
-    event WinnersAssigned(address[] _winners);
+    event WinnerAssigned(address indexed winner);
     event RandomWordRequested(
         uint256 requestId, 
         uint32 fromTicketId, 
@@ -48,7 +48,6 @@ interface IRPSSponsoredRaffle {
         uint256 randomWord
     );
     event Claim(address indexed user, uint256 amount);
-    event PrizeDistributionUpdated(uint128[] _newPrizeAmounts, uint16 newNumberOfWinners);
     event CallbackGasLimitUpdated(uint32 _callbackGasLimit);
     event RaffleTicketCostUpdated(uint256 newTicketCost);
     event PotLimitUpdated(uint256 newPotLimit);
@@ -60,15 +59,7 @@ interface IRPSSponsoredRaffle {
         address _user 
     ) external;
 
-    function batchExecuteTrade(
-        BatchTradeParams[] memory trades
-    ) external;
-
-    function executeRaffle(address[] calldata _winners) external;
+    function executeRaffle(address winner) external;
 
     function claim() external;
-    function updatePrizeDistribution(
-        uint128[] memory _newPrizeAmounts,
-        uint16 _newNumberOfWinners
-    ) external;   
 }

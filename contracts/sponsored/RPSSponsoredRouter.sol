@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {IRPSSponsoredRaffle} from "../interface/IRPSSponsoredRaffle.sol";
+import {IRPSSponsoredRaffle} from "./IRPSSponsoredRaffle.sol";
 import {IRPSRouter} from "../interface/IRPSRouter.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -18,40 +18,12 @@ contract RPSRouter is IRPSRouter, Ownable {
     function execute(
         bytes calldata data, 
         uint256 tradeAmount
-    ) external {
-        // Validate value
-        uint16 raffleTradeFee = raffle.tradeFeeInBps();
-        uint256 raffleDelta = tradeAmount * raffleTradeFee / HUNDRED_PERCENT;
- 
-        // Generating tickets
-        raffle.executeTrade{ value: raffleDelta }(tradeAmount, msg.sender);
-
-        // Integration call
-        (bool success,) = protocol.call{ value: msg.value - raffleDelta }(data);
-        require(success, "Call unsuccessful");
-    }
-
-    function executeBatch(
-        bytes calldata data,
-        IRPSSponsoredRaffle.BatchTradeParams[] calldata params
     ) external payable {
-        // Validate value
-        uint16 raffleTradeFee = raffle.tradeFeeInBps();
-        uint256 tradeAmountTotal;
-        uint256 trades_n = params.length;
-
-        for (uint i = 0; i < trades_n; i++) {
-            tradeAmountTotal += params[i].tradeAmount;
-        }
-
-        uint256 raffleDelta = tradeAmountTotal * raffleTradeFee / HUNDRED_PERCENT;
-        require(msg.value >= tradeAmountTotal, "Insufficient funds");
- 
         // Generating tickets
-        raffle.batchExecuteTrade{ value: raffleDelta }(params);
+        raffle.executeTrade(tradeAmount, msg.sender);
 
         // Integration call
-        (bool success,) = protocol.call{ value: msg.value - raffleDelta }(data);
+        (bool success,) = protocol.call{ value: msg.value}(data);
         require(success, "Call unsuccessful");
     }
 
