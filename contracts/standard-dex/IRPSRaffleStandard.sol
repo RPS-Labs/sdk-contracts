@@ -12,23 +12,16 @@ interface IRPSRaffleStandard {
         uint256 raffleTicketCostUSD;
         uint32 rafflePeriod;
         uint128 claimWindow;
-        uint32 callbackGasLimit;
-        uint8 vrfConfirmations;
         address sponsoredToken;
         address router;
         address owner;
         address operator;
     }
 
-    struct RequestStatus {
-        bool fullfilled;
-        bool exists;
-        uint256 randomWord;
-    }
-
-    struct BatchTradeParams {
-        uint256 tradeAmount;
-        address user;
+    struct RaffleStatus {
+        bool closed;
+        bool drawn;
+        bool winnerAssigned;
     }
 
 	event GenerateRaffleTickets(
@@ -37,26 +30,24 @@ interface IRPSRaffleStandard {
 		uint32 ticketIdEnd,
 		uint256 pendingAmount
 	);
-    event WinnerAssigned(address indexed winner);
-    event RandomWordRequested(
-        uint256 requestId, 
-        uint32 fromTicketId, 
-        uint32 toTicketId 
-    );
+    event WinnerAssigned(address indexed winner, uint16 potId);
+    event RandomWordRequested(uint16 potId);
     event RandomnessFulfilled(
         uint16 indexed potId, 
-        uint256 randomWord
+        uint32 winningTicketId
     );
     event Claim(address indexed user, uint256 amount);
-    event CallbackGasLimitUpdated(uint32 _callbackGasLimit);
     event RaffleTicketCostUpdated(uint256 newTicketCost);
     event PotLimitUpdated(uint256 newPotLimit);
     event RaffleStarted(uint32 deadline);
     event RafflePeriodUpdated(uint32 newPeriod);
+    event AddedIncentivizedToken(address token);
+    event RemovedIncentivizedToken(address token);
 
     function executeTrade(
-        uint256 _amount,
-        address _user 
+        uint256 inputAmount, 
+        address _user,
+        address token
     ) external;
 
     function executeRaffle(address winner) external;

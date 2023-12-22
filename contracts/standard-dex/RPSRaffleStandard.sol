@@ -4,13 +4,18 @@ import {IRPSRaffleStandard} from "./IRPSRaffleStandard.sol";
 import {Ownable} from "../OZx4/access/Ownable.sol";
 import {Pausable} from "../OZx4/security/Pausable.sol";
 import "../OZx4/token/ERC20/utils/SafeERC20.sol";
+import "../OZx4/utils/structs/EnumerableMap.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/contracts/src/v0.8/Denominations.sol";
 
-contract RPSSponsoredRaffle is 
+contract RPSRaffleStandard is 
     IRPSRaffleStandard, 
     Ownable,
     Pausable
 {
     using SafeERC20 for IERC20;
+    using EnumerableMap for EnumerableMap.AddressToUintMap;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /* 
         Raffle params
@@ -23,14 +28,16 @@ contract RPSSponsoredRaffle is
     uint32 public raffleEndTime;
     IERC20 public immutable sponsoredToken;
     uint128 private immutable claimWindow;
+    EnumerableSet.AddressSet private incentivizedTokens;
 
     /* 
         Mappings
      */
     mapping(address => Prize) public claimablePrizes;
-    mapping(uint256 => RequestStatus) public randomnessRequests;
+    mapping(address => AggregatorV3Interface) public usdPriceFeeds;
+    mapping(uint16 => RaffleStatus) public raffleStatus; // potId -> status
     mapping(uint16 => uint32) public winningTicketIds; // potId -> winning ticket
-    mapping(address => uint256) public pendingAmounts;
+    mapping(address => uint256) public pendingAmountsUSD;
 
     /* 
         Ticket data
@@ -67,9 +74,7 @@ contract RPSSponsoredRaffle is
         _;
     }
 
-    constructor(
-        InitializeParams memory params
-    ) {
+    constructor(InitializeParams memory params) {
         require(params.potLimit > 0, "Pot limit must be non-zero");
         require(params.rafflePeriod > 24 hours, "Raffle draw period is too short");
         require(params.claimWindow > 24 hours, "Claim window too short");
@@ -92,17 +97,27 @@ contract RPSSponsoredRaffle is
 
     function startRaffle() external onlyOwner {
         require(raffleEndTime == 0, "You've already started the raffle");
-        require(sponsoredAmount >= potLimit, "You must fully sponsor the raffle before starting it");
-        raffleEndTime = uint32(block.timestamp) + rafflePeriod;
-        emit RaffleStarted(raffleEndTime);
+        require(isCurrentRaffleSponsored(), "You must fully sponsor the raffle before starting it");
+
+        uint32 _endTime = uint32(block.timestamp) + rafflePeriod;
+        raffleEndTime = _endTime;
+        emit RaffleStarted(_endTime);
     } 
     
     function executeTrade(
-        uint256 _amountInWei, 
-        address _user
+        uint256 inputAmount, 
+        address _user,
+        address token
     ) external onlyRouter whenNotPaused raffleStarted {
+        if (
+            inputAmount == 0 ||
+            !isIncentivizedToken(token)
+        ) {
+            return; // inappropriate cases, but we still want to continue the swap
+        }
+
         _executeTrade(
-            _amountInWei,
+            _convertToUsd(token, inputAmount),
             _user
         );
 
@@ -116,18 +131,55 @@ contract RPSSponsoredRaffle is
         sponsoredAmount += amount;
     }
 
+    function addIncentivizedToken(address token) external onlyOwner {
+        require(token != address(0), "Zero address");
+
+        bool added = incentivizedTokens.add(token);
+        if (!added) {
+            revert("Already approved");
+        }
+
+        emit AddedIncentivizedToken(token);
+    } 
+
+    function removeIncentivizedToken(address token) external onlyOwner {
+        bool removed = incentivizedTokens.remove(token);
+        if (!removed) {
+            revert("Token is not incentivized");
+        }
+        emit RemovedIncentivizedToken(token);
+    }
+
+    function configureUsdPriceFeeds(
+        address[] memory tokens,
+        address[] memory priceFeeds
+    ) external onlyOwner {
+        require(tokens.length == priceFeeds.length, "Arrays mismatch");
+
+        uint256 tokens_n = tokens.length;
+        for(uint i = 0; i < tokens_n; i++) {
+            usdPriceFeeds[tokens[i]] = AggregatorV3Interface(priceFeeds[i]);
+        }
+    }
+
     function executeRaffle(
         address winner
     ) external onlyOperator {
         uint _potLimit = potLimit;
+        uint16 prevPotId = currentPotId - 1;
+        RaffleStatus storage _status = raffleStatus[prevPotId];
+
         require(sponsoredToken.balanceOf(address(this)) >= _potLimit, 
             "Not enough funds to draw the pot");
+        require(_status.closed && _status.drawn && !_status.winnerAssigned, 
+            "Invalid status");
 
         Prize storage userPrize = claimablePrizes[winner];
         userPrize.deadline = uint128(block.timestamp + claimWindow);
         userPrize.amount = userPrize.amount + uint128(_potLimit);
+        _status.winnerAssigned = true;
 
-        emit WinnerAssigned(winner);
+        emit WinnerAssigned(winner, prevPotId);
     }
 
     function claim() external whenNotPaused {
@@ -149,6 +201,14 @@ contract RPSSponsoredRaffle is
 
     function getWinningTicketIds(uint16 _potId) external view returns(uint32) {
         return winningTicketIds[_potId];
+    }
+
+    function isIncentivizedToken(address token) public view returns(bool) {
+        return incentivizedTokens.contains(token);
+    }
+
+    function isCurrentRaffleSponsored() public view returns(bool) {
+        return sponsoredAmount >= potLimit;
     }
 
     /* 
@@ -194,16 +254,44 @@ contract RPSSponsoredRaffle is
      */
 
     function _executeTrade(
-        uint256 _amountInWei, 
+        uint256 usdTradeAmount, 
         address _user
     ) internal {
         uint256 _raffleTicketCost = raffleTicketCostUSD;
-        uint256 _userPendingAmount = pendingAmounts[_user];
-        uint32 tickets = uint32((_userPendingAmount + _amountInWei) / _raffleTicketCost);      
+        uint256 _userPendingAmount = pendingAmountsUSD[_user];
+        uint32 tickets = uint32((_userPendingAmount + usdTradeAmount) / _raffleTicketCost);      
 
-		pendingAmounts[_user] = (_userPendingAmount + _amountInWei) % _raffleTicketCost;
+		pendingAmountsUSD[_user] = (_userPendingAmount + usdTradeAmount) % _raffleTicketCost;
         
         _generateTickets(_user, tickets);
+    }
+
+    function _convertToUsd(
+        address token,
+        uint256 inputAmount
+    ) internal returns(uint256) {
+        AggregatorV3Interface priceFeed = usdPriceFeeds[token];
+        require(address(priceFeed) != address(0), 
+            "Conversion failed - price feed is not defined");
+        (
+            /* uint80 roundID */,
+            int256 answer,
+            /*uint startedAt*/,
+            uint256 updatedAt,
+            /*uint80 answeredInRound*/
+        ) = priceFeed.latestRoundData();
+        _validateFeedData(token, answer, updatedAt);
+
+        return inputAmount * uint256(answer);
+    }
+
+    function _validateFeedData(
+        address token,
+        int256 answer,
+        uint256 updatedAt
+    ) internal {
+        require(answer > 0, "Invalid price returned");
+        require(updatedAt > 0, "Feed round is not finalized");
     }
     
     function _generateTickets(
@@ -229,7 +317,7 @@ contract RPSSponsoredRaffle is
             _user, 
             ticketIdStart, 
             ticketIdEnd,
-            pendingAmounts[_user]
+            pendingAmountsUSD[_user]
         );
     }
 
@@ -254,41 +342,30 @@ contract RPSSponsoredRaffle is
 
         sponsoredAmount -= potLimit;
         raffleEndTime = uint32(block.timestamp) + rafflePeriod;
+
+        uint16 drawingPotId = currentPotId;
         currentPotId++;
-        _requestRandomWinners();
-    }
-
-    function _requestRandomWinners() internal {
-        uint256 id = ++lastRequestId;
-        randomnessRequests[id].exists = true;
-
-        emit RandomWordRequested(id, potTicketIdStart, potTicketIdEnd);
+        raffleStatus[drawingPotId].closed = true;
+        emit RandomWordRequested(drawingPotId); // emit first, then increment
     }
 
     function fulfillRandomWords(
         uint256 salt
     ) external onlyOperator {
-        uint256 _lastRequestId = lastRequestId;
-        RequestStatus memory lastRequest = randomnessRequests[_lastRequestId];
-
-        require(lastRequest.exists && !lastRequest.fullfilled, 
+        uint16 prevPotId = currentPotId - 1;
+        RaffleStatus storage _status = raffleStatus[prevPotId];
+        require(_status.closed && !_status.drawn, 
             "Cannot fulfill - invalid request status");
 
         uint32 rangeFrom = potTicketIdStart;
         uint32 rangeTo = potTicketIdEnd;
 
-        randomnessRequests[_lastRequestId] = RequestStatus({
-            fullfilled: true,
-            exists: true,
-            randomWord: salt
-        });
-
         uint256 randomWord = _generateRandomFromSalt(salt);
         uint32 winningTicket = _normalizeValueToRange(randomWord, rangeFrom, rangeTo);
 
-        uint16 prevPotId = currentPotId - 1;
         winningTicketIds[prevPotId] = winningTicket;
-        emit RandomnessFulfilled(prevPotId, randomWord);
+        _status.drawn = true;
+        emit RandomnessFulfilled(prevPotId, winningTicket);
     }
 
     function _generateRandomFromSalt(uint256 _salt) internal view returns(uint256 _random) {
