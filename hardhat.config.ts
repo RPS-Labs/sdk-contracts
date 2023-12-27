@@ -149,7 +149,7 @@ const config: HardhatUserConfig = {
     ]
   },
 
-  defaultNetwork: "lineaTestnet",
+  defaultNetwork: "hardhat",
 
   networks: {
     hardhat: {

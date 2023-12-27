@@ -1,5 +1,5 @@
 import { ethers, network } from 'hardhat';
-import { RPSRaffleInitializeParams, RPSRaffleCustomVrfInitializeParams } from './types';
+import { RPSRaffleInitializeParams, RPSRaffleCustomVrfInitializeParams, RPSRaffle_Sponsored_CustomVrf_InitParams } from './types';
 import { AddressZero } from "@ethersproject/constants";
 import { BigNumberish } from 'ethers';
 
@@ -58,6 +58,48 @@ export const CHAINLINK_VRF_CONFIRMATIONS: ChainIdToNumber = {
   [Network.ArbitrumSepolia]: 3,
   [Network.HardhatNetwork]: 3
 }
+
+/* 
+  ______________________
+      TOKENS
+  _____________________________
+ */
+
+export type ChainIdToToken = { [chainId: number]: Token}
+
+export type Token = {
+  address: string,
+  decimals: number
+}
+
+export const USD_DECIMALS = 8;
+
+
+/* 
+  _________________
+      DEFAULT PARAMETERS
+  _________________________
+ */
+import { Native, USDC, USDT } from '../Addresses';
+
+
+export const DefaultSponsoredRaffleCustomVrfParams: RPSRaffle_Sponsored_CustomVrf_InitParams = {
+  potLimit: ethers.parseUnits("1000.0", USDT[Network.HardhatNetwork].decimals),
+  raffleTicketCostUSD: ethers.parseUnits("3.0", USD_DECIMALS),
+  rafflePeriod: 24 * 60 * 60 * 2, // 2 days 
+  claimWindow: 24 * 60 * 60 * 7,
+  sponsoredToken: USDT[Network.HardhatNetwork].address,
+  router: AddressZero,
+  owner: AddressZero,
+  operator: AddressZero
+}
+
+export const DefaultStandardIncentivizedTokens = [
+  USDC[Network.HardhatNetwork],
+  Native[Network.HardhatNetwork]
+];
+
+export const DefaultSponsoredToken = USDT;
 
 export const DefaultPRSRaffleParams: RPSRaffleInitializeParams = {
   potLimit: ethers.parseEther("100.0"),

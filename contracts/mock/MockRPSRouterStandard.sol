@@ -21,21 +21,25 @@ contract MockRPSRouterStandard is Ownable {
         address token,
         uint256 amount,
         address maker
-    ) external {
+    ) external payable {
         IMatchingEngine _matchingEngine = matchingEngine;
+        bool isNative = token == address(0);
 
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        // Generating tickets
+        if (!isNative) {
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        }
         raffle.executeTrade(amount, maker, token);
 
         /* 
             Approve if needed
          */
-        if (IERC20(token).allowance(address(_matchingEngine), address(this)) < amount) {
+        if (!isNative && 
+            IERC20(token).allowance(address(_matchingEngine), address(this)) < amount
+        ) {
             IERC20(token).safeApprove(address(_matchingEngine), type(uint256).max);
         }
         // Integration call
-        _matchingEngine.limitBuy(token, amount, maker);
+        _matchingEngine.limitBuy{value: msg.value}(token, amount, maker);
     }
 
     function setRaffleAddress(address _raffle) external onlyOwner {

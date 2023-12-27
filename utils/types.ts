@@ -29,9 +29,21 @@ export type RPSRaffleCustomVrfInitializeParams = {
   operator: string
 }
 
+export type RPSRaffle_Sponsored_CustomVrf_InitParams = {
+  potLimit: BigNumberish,
+  raffleTicketCostUSD: BigNumberish,
+  rafflePeriod: number,
+  claimWindow: number,
+  sponsoredToken: string,
+  router: string,
+  owner: string,
+  operator: string
+}
+
 export type RPSRaffleArbitraryInitParams = 
   RPSRaffleInitializeParams &
-  RPSRaffleCustomVrfInitializeParams; 
+  RPSRaffleCustomVrfInitializeParams &
+  RPSRaffle_Sponsored_CustomVrf_InitParams; 
 
 export type BatchTradeParams = {
   tradeAmount: BigNumberish;

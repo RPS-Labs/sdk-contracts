@@ -131,23 +131,31 @@ contract RPSRaffleStandard is
         sponsoredAmount += amount;
     }
 
-    function addIncentivizedToken(address token) external onlyOwner {
-        require(token != address(0), "Zero address");
+    function addIncentivizedTokens(address[] memory tokens) external onlyOwner {
+        for(uint i = 0; i < tokens.length; i++) {
+            address token = tokens[i];
 
-        bool added = incentivizedTokens.add(token);
-        if (!added) {
-            revert("Already approved");
+            bool added = incentivizedTokens.add(token);
+            if (!added) {
+                revert("Already approved");
+            }
+
+            emit AddedIncentivizedToken(token);
         }
-
-        emit AddedIncentivizedToken(token);
     } 
 
-    function removeIncentivizedToken(address token) external onlyOwner {
-        bool removed = incentivizedTokens.remove(token);
-        if (!removed) {
-            revert("Token is not incentivized");
+    function removeIncentivizedTokens(address[] memory tokens) external onlyOwner {
+        for(uint i = 0; i < tokens.length; i++) {
+            address token = tokens[i];
+
+            bool removed = incentivizedTokens.remove(token);
+            if (!removed) {
+                revert("Token is not incentivized");
+            }
+
+            emit RemovedIncentivizedToken(token);
         }
-        emit RemovedIncentivizedToken(token);
+        
     }
 
     function configureUsdPriceFeeds(
@@ -269,7 +277,7 @@ contract RPSRaffleStandard is
     function _convertToUsd(
         address token,
         uint256 inputAmount
-    ) internal returns(uint256) {
+    ) internal view returns(uint256) {
         AggregatorV3Interface priceFeed = usdPriceFeeds[token];
         require(address(priceFeed) != address(0), 
             "Conversion failed - price feed is not defined");
@@ -280,16 +288,15 @@ contract RPSRaffleStandard is
             uint256 updatedAt,
             /*uint80 answeredInRound*/
         ) = priceFeed.latestRoundData();
-        _validateFeedData(token, answer, updatedAt);
+        _validateFeedData(answer, updatedAt);
 
         return inputAmount * uint256(answer);
     }
 
     function _validateFeedData(
-        address token,
         int256 answer,
         uint256 updatedAt
-    ) internal {
+    ) internal pure {
         require(answer > 0, "Invalid price returned");
         require(updatedAt > 0, "Feed round is not finalized");
     }

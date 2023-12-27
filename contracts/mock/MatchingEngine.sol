@@ -7,7 +7,7 @@ interface IMatchingEngine {
         address token,
         uint256 amount,
         address maker
-    ) external;
+    ) external payable;
 }
 
 contract MatchingEngine is IMatchingEngine {
@@ -18,7 +18,7 @@ contract MatchingEngine is IMatchingEngine {
         address token,
         uint256 amount,
         address maker
-    ) external {
+    ) external payable {
        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
        lastMaker = maker;
     }
