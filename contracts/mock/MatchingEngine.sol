@@ -19,7 +19,12 @@ contract MatchingEngine is IMatchingEngine {
         uint256 amount,
         address maker
     ) external payable {
-       IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-       lastMaker = maker;
+        if (token != address(0)) {
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        }
+        else {
+            require(msg.value >= amount, "Insufficient funds");
+        }
+        lastMaker = maker;
     }
 }

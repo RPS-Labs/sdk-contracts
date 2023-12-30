@@ -81,11 +81,11 @@ export const Native: ChainIdToToken = {
 
 export const USDC: ChainIdToToken = {
   [Network.Ethereum]: {
-    address: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     decimals: 6
   },
   [Network.HardhatNetwork]: {
-    address: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
     decimals: 6
   }
 }
@@ -128,6 +128,7 @@ export const BUSD_USD_PAIR: ChainIdToAddress = {
 }
 
 const EthereumPriceFeedsByToken = new Map<Token, string>();
+const HardhatPriceFeedsByToken = new Map<Token, string>();
 const LineaTestnetFeedsByToken = new Map<Token, string>();
 const LineaFeedsByToken = new Map<Token, string>();
 
@@ -136,6 +137,8 @@ const LineaFeedsByToken = new Map<Token, string>();
  */
 EthereumPriceFeedsByToken.set(Native[Network.Ethereum], ETH_USD_PAIR[Network.Ethereum]);
 EthereumPriceFeedsByToken.set(USDC[Network.Ethereum], USDC_USD_PAIR[Network.Ethereum]);
+HardhatPriceFeedsByToken.set(USDC[Network.HardhatNetwork], USDC_USD_PAIR[Network.HardhatNetwork]);
+HardhatPriceFeedsByToken.set(Native[Network.HardhatNetwork], ETH_USD_PAIR[Network.HardhatNetwork]);
 /* 
   Linea feeds
  */
@@ -146,7 +149,7 @@ LineaFeedsByToken.set(Native[Network.Linea], ETH_USD_PAIR[Network.Linea]);
 
 export const FeedsByNetwork: {[chainId: number]: Map<Token, string>} = {
   [Network.Ethereum]: EthereumPriceFeedsByToken,
-  [Network.HardhatNetwork]: EthereumPriceFeedsByToken,
+  [Network.HardhatNetwork]: HardhatPriceFeedsByToken,
   [Network.LineaTestnet]: LineaTestnetFeedsByToken,
   [Network.Linea]: LineaFeedsByToken
 }
@@ -154,5 +157,5 @@ export const FeedsByNetwork: {[chainId: number]: Map<Token, string>} = {
 export const TokenWhale: Map<Token, string> = new Map<Token, string>();
 TokenWhale.set(USDT[Network.Ethereum], "0xF977814e90dA44bFA03b6295A0616a897441aceC");
 TokenWhale.set(USDT[Network.HardhatNetwork], "0xF977814e90dA44bFA03b6295A0616a897441aceC");
-TokenWhale.set(USDC[Network.HardhatNetwork], "0xcEe284F754E854890e311e3280b767F80797180d");
-TokenWhale.set(USDC[Network.Ethereum], "0xcEe284F754E854890e311e3280b767F80797180d");
+TokenWhale.set(USDC[Network.HardhatNetwork], "0xF977814e90dA44bFA03b6295A0616a897441aceC");
+TokenWhale.set(USDC[Network.Ethereum], "0xF977814e90dA44bFA03b6295A0616a897441aceC");

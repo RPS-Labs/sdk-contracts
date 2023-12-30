@@ -7,6 +7,9 @@ import "../OZx4/token/ERC20/utils/SafeERC20.sol";
 import "../OZx4/utils/structs/EnumerableMap.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@chainlink/contracts/src/v0.8/Denominations.sol";
+import {IERC20Metadata} from "../OZx4/token/ERC20/extensions/IERC20Metadata.sol";
+
+//import "hardhat/console.sol";
 
 contract RPSRaffleStandard is 
     IRPSRaffleStandard, 
@@ -38,6 +41,7 @@ contract RPSRaffleStandard is
     mapping(uint16 => RaffleStatus) public raffleStatus; // potId -> status
     mapping(uint16 => uint32) public winningTicketIds; // potId -> winning ticket
     mapping(address => uint256) public pendingAmountsUSD;
+    mapping(address => uint8) private tokenDecimals;
 
     /* 
         Ticket data
@@ -138,6 +142,13 @@ contract RPSRaffleStandard is
             bool added = incentivizedTokens.add(token);
             if (!added) {
                 revert("Already approved");
+            }
+
+            if (token == address(0)) {
+                tokenDecimals[token] = 18;
+            }
+            else {
+                tokenDecimals[token] = IERC20Metadata(token).decimals();
             }
 
             emit AddedIncentivizedToken(token);
@@ -290,7 +301,7 @@ contract RPSRaffleStandard is
         ) = priceFeed.latestRoundData();
         _validateFeedData(answer, updatedAt);
 
-        return inputAmount * uint256(answer);
+        return inputAmount * uint256(answer) / 10**tokenDecimals[token];
     }
 
     function _validateFeedData(
